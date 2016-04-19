@@ -18,6 +18,7 @@ import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg;
 import org.corfudb.runtime.CorfuRuntime;
 import org.corfudb.runtime.exceptions.OverwriteException;
 import org.corfudb.util.Utils;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 
 /** All replication views must inherit from this class.
@@ -30,24 +31,23 @@ import org.corfudb.util.Utils;
 @Slf4j
 public abstract class AbstractReplicationView {
 
-    public static AbstractReplicationView getReplicationView(Layout l, Layout.ReplicationMode mode, Layout.LayoutSegment ls)
-    {
-        switch (mode)
-        {
+    public static AbstractReplicationView getReplicationView(Layout l, Layout.ReplicationMode mode, Layout.LayoutSegment ls) {
+        switch (mode) {
             case CHAIN_REPLICATION:
                 return new ChainReplicationView(l, ls);
             case QUORUM_REPLICATION:
                 log.warn("Quorum replication is not yet supported!");
                 break;
+            case REPLEX_REPLICATION:
+                return new ReplexReplicationView(l, ls);
         }
         log.error("Unknown replication mode {} selected.", mode);
         throw new RuntimeException("Unsupported replication mode.");
     }
 
-    @ToString(exclude={"runtime"})
+    @ToString(exclude = {"runtime"})
     @RequiredArgsConstructor
-    public static class CachedLogUnitEntry implements ILogUnitEntry
-    {
+    public static class CachedLogUnitEntry implements ILogUnitEntry {
         @Getter
         final LogUnitReadResponseMsg.ReadResultType resultType;
 
@@ -62,7 +62,9 @@ public abstract class AbstractReplicationView {
 
         final CorfuRuntime runtime;
 
-        public ILogUnitEntry setRuntime(CorfuRuntime runtime) {return this;}
+        public ILogUnitEntry setRuntime(CorfuRuntime runtime) {
+            return this;
+        }
 
         @Getter
         final int sizeEstimate;
@@ -85,47 +87,52 @@ public abstract class AbstractReplicationView {
     @Getter
     public final Layout.LayoutSegment segment;
 
-    public AbstractReplicationView(Layout layout, Layout.LayoutSegment ls)
-    {
+    public AbstractReplicationView(Layout layout, Layout.LayoutSegment ls) {
         this.layout = layout;
         this.segment = ls;
     }
 
-    /** Write the given object to an address and streams, using the replication method given.
+    /**
+     * Write the given object to an address and streams, using the replication method given.
      *
-     * @param address   An address to write to.
-     * @param stream    The streams which will belong on this entry.
-     * @param data      The data to write.
+     * @param address An address to write to.
+     * @param stream  The streams which will belong on this entry.
+     * @param data    The data to write.
      */
     public void write(long address, Set<UUID> stream, Object data)
-        throws OverwriteException
-    {
+            throws OverwriteException {
         write(address, stream, data, Collections.emptyMap());
     }
 
-    /** Write the given object to an address and streams, using the replication method given.
+    /**
+     * Write the given object to an address and streams, using the replication method given.
      *
-     * @param address           An address to write to.
-     * @param stream            The streams which will belong on this entry.
-     * @param data              The data to write.
-     * @param backpointerMap    The map of backpointers to write.
-     *
+     * @param address        An address to write to.
+     * @param stream         The streams which will belong on this entry.
+     * @param data           The data to write.
+     * @param backpointerMap The map of backpointers to write.
      * @return The number of bytes that was remotely written.
      */
     public abstract int write(long address, Set<UUID> stream, Object data, Map<UUID, Long> backpointerMap)
-        throws OverwriteException;
+            throws OverwriteException;
 
-    /** Read the given object from an address, using the replication method given.
+    /**
+     * Read the given object from an address, using the replication method given.
      *
-     * @param address   The address to read from.
-     * @return          The result of the read.
+     * @param address The address to read from.
+     * @return The result of the read.
      */
     public abstract ILogUnitEntry read(long address);
 
-    /** Read a set of addresses, using the replication method given.
+    public ILogUnitEntry streamRead(UUID stream, long offset) {
+        throw new UnsupportedOperationException("Tried streamRead on a ReplicationView that doesn't support");
+    }
+
+    /**
+     * Read a set of addresses, using the replication method given.
      *
-     * @param addresses   The addresses to read from.
-     * @return            A map containing the results of the read.
+     * @param addresses The addresses to read from.
+     * @return A map containing the results of the read.
      */
     public Map<Long, ILogUnitEntry> read(RangeSet<Long> addresses) {
         Map<Long, ILogUnitEntry> results = new ConcurrentHashMap<>();
@@ -135,18 +142,24 @@ public abstract class AbstractReplicationView {
         return results;
     }
 
-    /** Read a contiguous stream prefix, using the replication method given.
+    /**
+     * Read a contiguous stream prefix, using the replication method given.
      *
-     * @param stream      The stream to read from.
-     * @return            A map containing the results of the read.
+     * @param stream The stream to read from.
+     * @return A map containing the results of the read.
      */
     public abstract Map<Long, ILogUnitEntry> read(UUID stream);
 
-    /** Fill a hole at an address, using the replication method given.
+    /**
+     * Fill a hole at an address, using the replication method given.
      *
-     * @param address   The address to hole fill at.
+     * @param address The address to hole fill at.
      */
     public abstract void fillHole(long address)
-        throws OverwriteException;
+            throws OverwriteException;
+
+    public void fillHole(UUID streamID, long offset) throws OverwriteException {
+        throw new UnsupportedOperationException("This log unit doesn't implement fillStreamHole");
+    }
 
 }

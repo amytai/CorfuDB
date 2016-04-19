@@ -7,6 +7,7 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.TreeRangeSet;
+import javafx.util.Pair;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,9 @@ public class AddressSpaceView extends AbstractView {
 
     /** A cache for read results. */
     static LoadingCache<Long, ILogUnitEntry> readCache;
+
+    /** A cache for mapping (streamID, offset) -> address, to be looked up in readCache. */
+    static Cache<Pair<UUID, Long>, Long> streamMapCache;
 
     /** A cache for stream addresses. */
     static LoadingCache<UUID, Set<Long>> streamAddressCache;
@@ -78,6 +82,8 @@ public class AddressSpaceView extends AbstractView {
 
         streamAddressCache = Caffeine.newBuilder()
                 .build(this::getStream);
+
+        streamMapCache = Caffeine.newBuilder().build();
     }
 
     /** Learn about a stream for the first time.
@@ -174,6 +180,27 @@ public class AddressSpaceView extends AbstractView {
     }
 
     /**
+     * Read the given object from the streamID and offset.
+     *
+     * @param streamID  Stream to read from.
+     * @param offset    Offset within the stream to read from.
+     * @return          A result, which be cached.
+     */
+    public ILogUnitEntry read(UUID streamID, long offset)
+    {
+        ILogUnitEntry ret;
+        if (!runtime.isCacheDisabled()) {
+            Long address = streamMapCache.getIfPresent(new Pair(streamID, offset));
+            if (address != null) {
+                ret = readCache.getIfPresent(address);
+                if (ret != null)
+                    return ret;
+            }
+        }
+        return streamFetch(streamID, offset);
+    }
+
+    /**
      * Read the given object from a range of addresses.
      *
      * @param addresses An address range to read from.
@@ -266,6 +293,17 @@ public class AddressSpaceView extends AbstractView {
         return layoutHelper(l -> AbstractReplicationView
                         .getReplicationView(l, l.getReplicationMode(address), l.getSegment(address))
                         .read(address)
+        ).setRuntime(runtime);
+    }
+
+    public ILogUnitEntry streamFetch(UUID streamID, long offset)
+    {
+        //TODO: for now, only returns the first segment, because you cannot mix replication modes..
+        //TODO: reconfigs that are correct for ReplexReplicationMode
+        return layoutHelper(l -> AbstractReplicationView
+                .getReplicationView(l, Layout.ReplicationMode.REPLEX_REPLICATION,
+                        l.getSegments().get(l.getSegments().size()))
+                .streamRead(streamID, offset)
         ).setRuntime(runtime);
     }
 

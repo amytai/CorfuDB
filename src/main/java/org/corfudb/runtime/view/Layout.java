@@ -12,6 +12,7 @@ import org.corfudb.util.CFUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 /**
@@ -168,6 +169,14 @@ public class Layout implements Cloneable {
         throw new RuntimeException("Unmapped address!");
     }
 
+    // TODO: We ignore reconfiguration for Replexes for now. So this means we always assume we are
+    // TODO: from the most recent segment.
+    public LayoutStripe getStripe(UUID streamID)
+    {
+        LayoutSegment ls = segments.get(segments.size()-1);
+        return ls.getReplexStripes().get(streamID.hashCode() % ls.getNumberOfReplexStripes());
+    }
+
     public LayoutSegment getSegment(long globalAddress)
     {
         for (LayoutSegment ls : segments)
@@ -215,7 +224,12 @@ public class Layout implements Cloneable {
      */
     public LogUnitClient getLogUnitClient(long address, int index)
     {
-         return runtime.getRouter(getStripe(address).getLogServers().get(index)).getClient(LogUnitClient.class);
+        return runtime.getRouter(getStripe(address).getLogServers().get(index)).getClient(LogUnitClient.class);
+    }
+
+    public ReplexLogUnitClient getReplexLogUnitClient(UUID streamID, int index)
+    {
+        return runtime.getRouter(getStripe(streamID).getLogServers().get(index)).getClient(ReplexLogUnitClient.class);
     }
 
     /** Get the layout as a JSON string. */
@@ -306,11 +320,11 @@ public class Layout implements Cloneable {
     public enum ReplicationMode {
         CHAIN_REPLICATION,
         QUORUM_REPLICATION,
+        REPLEX_REPLICATION,
         NO_REPLICATION
     }
 
     @Data
-    @AllArgsConstructor
     public static class LayoutSegment {
         /** The replication mode of the segment. */
         ReplicationMode replicationMode;
@@ -321,9 +335,30 @@ public class Layout implements Cloneable {
         /** A list of log servers for this segment. */
         List<LayoutStripe> stripes;
 
+        public LayoutSegment(ReplicationMode replicationMode, long start, long end, List<LayoutStripe> stripes) {
+            this.replicationMode = replicationMode;
+            this.start = start;
+            this.end = end;
+            this.stripes = stripes;
+        }
+
+        // TODO: Should generalize how we specify the server list for each layer of the Replex system
+        // For now, assume we have to create a list of stripes per layer.
+        // Set the replex stripes before using it; we don't add in the constructor so we don't break
+        // backwards compatibility.
+        /** A list of replex servers for this segment. */
+        /** In a Replex replication scheme, all writes must visit all servers in all the *Stripes,
+         *  each stripe represents one replex.
+         */
+        List<LayoutStripe> replexStripes;
+
         public int getNumberOfStripes()
         {
             return stripes.size();
+        }
+        public int getNumberOfReplexStripes()
+        {
+            return replexStripes.size();
         }
     }
 
