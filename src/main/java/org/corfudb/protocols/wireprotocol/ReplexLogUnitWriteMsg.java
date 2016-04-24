@@ -4,8 +4,9 @@ import io.netty.buffer.ByteBuf;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
-import java.util.UUID;
+import java.util.*;
 
 
 /**
@@ -14,24 +15,30 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-public class LogUnitStreamReadRequestMsg extends CorfuMsg {
+@ToString(callSuper=true)
+public class ReplexLogUnitWriteMsg extends LogUnitPayloadMsg {
 
-    /** Stream address are tuples (streamID, offset), where offset is the local offset within the stream. */
+
+    /** The streamID and local offset to write to. */
     UUID streamID;
     long offset;
 
-    public LogUnitStreamReadRequestMsg(UUID streamID, long offset)
+    public ReplexLogUnitWriteMsg(UUID streamID, long offset)
     {
-        this.msgType = CorfuMsgType.READ_REQUEST;
+        this.msgType = CorfuMsgType.REPLEX_WRITE;
         this.streamID = streamID;
         this.offset = offset;
+        this.metadataMap = new EnumMap<>(IMetadata.LogUnitMetadataType.class);
     }
+
+
     /**
      * Serialize the message into the given bytebuffer.
      *
      * @param buffer The buffer to serialize to.
      */
     @Override
+    @SuppressWarnings("unchecked")
     public void serialize(ByteBuf buffer) {
         super.serialize(buffer);
         buffer.writeLong(streamID.getMostSignificantBits());

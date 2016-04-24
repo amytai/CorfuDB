@@ -16,7 +16,8 @@ public interface IMetadata {
         STREAM(0),
         RANK(1),
         STREAM_ADDRESS(2),
-        BACKPOINTER_MAP(3)
+        BACKPOINTER_MAP(3),
+        REPLEX_COMMIT(4),
         ;
 
         final int type;
@@ -101,5 +102,13 @@ public interface IMetadata {
     {
         return (Map<UUID, Long>) getMetadataMap().getOrDefault(LogUnitMetadataType.BACKPOINTER_MAP,
                 Collections.EMPTY_MAP);
+    }
+
+    default void setReplexCommit(boolean commit) {
+        getMetadataMap().put(LogUnitMetadataType.REPLEX_COMMIT, commit);
+    }
+
+    default boolean getReplexCommit() {
+        return (boolean) getMetadataMap().getOrDefault(LogUnitMetadataType.REPLEX_COMMIT, false);
     }
 }

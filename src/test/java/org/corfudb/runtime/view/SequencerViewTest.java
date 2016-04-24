@@ -1,13 +1,10 @@
 package org.corfudb.runtime.view;
 
 import lombok.Getter;
-import org.corfudb.infrastructure.LayoutServer;
-import org.corfudb.infrastructure.SequencerServer;
 import org.corfudb.runtime.CorfuRuntime;
 import org.junit.Test;
 
-import java.util.Collections;
-import java.util.UUID;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -80,5 +77,36 @@ public class SequencerViewTest extends AbstractViewTest {
                 .containsEntry(streamA, 0L);
         assertThat(r.getSequencerView().nextToken(Collections.singleton(streamB), 1).getBackpointerMap())
                 .containsEntry(streamB, 1L);
+    }
+
+    @Test
+    public void replexAddressFlagWorks() throws Exception {
+        CorfuRuntime r = getDefaultRuntime();
+        UUID streamA = UUID.nameUUIDFromBytes("streamA".getBytes());
+        UUID streamB = UUID.nameUUIDFromBytes("streamB".getBytes());
+        HashSet<UUID> streams = new HashSet();
+        streams.add(streamA);
+        streams.add(streamB);
+
+        assertThat(
+                r.getSequencerView().nextTokenWrapper(Collections.singleton(streamA), 1, true).getBackpointerMap())
+                .containsEntry(streamA, 0L);
+        assertThat(
+                r.getSequencerView().nextToken(Collections.singleton(streamA), 0).getToken())
+                .isEqualTo(0L);
+        assertThat(
+                r.getSequencerView().nextTokenWrapper(Collections.singleton(streamA), 1, true).getBackpointerMap())
+                .containsEntry(streamA, 1L);
+        assertThat(
+                r.getSequencerView().nextToken(Collections.singleton(streamA), 1).getBackpointerMap())
+                .containsEntry(streamA, 1L);
+
+        Map<UUID, Long> map = r.getSequencerView().nextToken(streams, 1).getBackpointerMap();
+        assertThat(map).containsEntry(streamA, 2L);
+        assertThat(map).containsEntry(streamB, -1L);
+
+        map = r.getSequencerView().nextTokenWrapper(streams, 1, true).getBackpointerMap();
+        assertThat(map).containsEntry(streamA, 4L);
+        assertThat(map).containsEntry(streamB, 1L);
     }
 }

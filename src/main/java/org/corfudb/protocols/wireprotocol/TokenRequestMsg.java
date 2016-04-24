@@ -26,7 +26,8 @@ public class TokenRequestMsg extends CorfuMsg {
     Set<TokenRequestFlags> tokenFlags;
 
     public enum TokenRequestFlags {
-        STREAM_HINT((short) 1)
+        STREAM_HINT((short) 1),
+        REPLEX_ADDRESSES((short) 2)
         ;
 
         private final short flag;

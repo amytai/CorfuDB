@@ -76,6 +76,11 @@ public class CorfuMsg {
         READ_RANGE(40, CorfuRangeMsg.class, LogUnitServer.class),
         READ_RANGE_RESPONSE(41, LogUnitReadRangeResponseMsg.class, LogUnitServer.class),
         STREAM_READ(42, CorfuUUIDMsg.class, LogUnitServer.class),
+        REPLEX_COMMIT(43, ReplexCommitMsg.class, ReplexServer.class),
+        REPLEX_FILL_HOLE(44, ReplexLogUnitFillHoleMsg.class, ReplexServer.class),
+        REPLEX_READ_REQUEST(45, ReplexLogUnitReadRequestMsg.class, ReplexServer.class),
+        REPLEX_WRITE(46, ReplexLogUnitWriteMsg.class, ReplexServer.class),
+        LOG_REPLEX_COMMIT(47, LogUnitCommitMsg.class, LogUnitServer.class),
 
         // Logging Unit Error Codes
         ERROR_OK(50, CorfuMsg.class, LogUnitServer.class),

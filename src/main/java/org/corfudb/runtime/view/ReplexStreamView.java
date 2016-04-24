@@ -3,7 +3,6 @@ package org.corfudb.runtime.view;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
-import org.corfudb.protocols.logprotocol.LogEntry;
 import org.corfudb.protocols.logprotocol.StreamCOWEntry;
 import org.corfudb.protocols.wireprotocol.ILogUnitEntry;
 import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg;
@@ -13,10 +12,8 @@ import org.corfudb.runtime.clients.SequencerClient;
 import org.corfudb.runtime.exceptions.OverwriteException;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -118,7 +115,7 @@ public class ReplexStreamView implements AutoCloseable {
     {
         while (true) {
             SequencerClient.TokenResponse tokenResponse =
-                    runtime.getSequencerView().nextToken(Collections.singleton(streamID), 1);
+                    runtime.getSequencerView().nextTokenWrapper(Collections.singleton(streamID), 1, true);
             long token = tokenResponse.getToken();
             log.trace("Write[{}]: acquired token = {}", streamID, token);
             if (acquisitionCallback != null) {

@@ -16,10 +16,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileSystems;
 import java.nio.file.StandardOpenOption;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -54,6 +51,9 @@ public class SequencerServer implements IServer {
      */
     ConcurrentHashMap<UUID, Long> lastIssuedMap;
 
+    // A map from stream to most recently issued local offset.
+    ConcurrentHashMap<UUID, Long> lastOffsetMap;
+
 
 
     /**
@@ -71,6 +71,7 @@ public class SequencerServer implements IServer {
     {
         this.opts = opts;
         lastIssuedMap = new ConcurrentHashMap<>();
+        lastOffsetMap = new ConcurrentHashMap<>();
         globalIndex = new AtomicLong();
 
         try {
@@ -163,19 +164,64 @@ public class SequencerServer implements IServer {
                             new TokenResponseMsg(max, Collections.emptyMap()));
                 }
                 else {
+                    // The following is to make sure the global token handed out does not go backwards
+                    // to the local stream offsets.
+                    Long maxtoken = lastIssuedMap.reduce(1, (k, v) -> {
+                        if (req.getStreamIDs().contains(k)) {
+                            return v;
+                        }
+                        return -1L;
+                    }, Math::max);
+
+                    globalIndex.updateAndGet(u -> {
+                        if (maxtoken == null)
+                            return u;
+                        return Math.max(u, maxtoken);
+                    });
+                    ////////////////
+
                     long thisIssue = globalIndex.getAndAdd(req.getNumTokens());
-                    ImmutableMap.Builder<UUID,Long> mb  = ImmutableMap.builder();
-                    for (UUID id : req.getStreamIDs()) {
-                        lastIssuedMap.compute(id, (k, v) ->{
-                                if (v == null)
-                                {
+                    // If REPLEX_ADDRESSES is set, then return the local offsets of the streams that are touched.
+                    ImmutableMap.Builder<UUID, Long> mb = ImmutableMap.builder();
+                    if (req.getTokenFlags() != null && req.getTokenFlags()
+                            .contains(TokenRequestMsg.TokenRequestFlags.REPLEX_ADDRESSES)) {
+                        for (UUID id : req.getStreamIDs()) {
+                            // still keep backpointer map up-to-date
+                            lastIssuedMap.compute(id, (k, v) -> {
+                                if (v == null) {
+                                    return thisIssue + req.getNumTokens() - 1;
+                                }
+                                return Math.max(thisIssue + req.getNumTokens() - 1, v);
+                            });
+                            lastOffsetMap.compute(id, (k, v) -> {
+                                if (v == null) {
+                                    mb.put(k, 0L);
+                                    return 0L;
+                                }
+                                mb.put(k, v + req.getNumTokens());
+                                return v + req.getNumTokens();
+                            });
+                        }
+                    } else {
+                        for (UUID id : req.getStreamIDs()) {
+                            lastIssuedMap.compute(id, (k, v) -> {
+                                if (v == null) {
                                     mb.put(k, -1L);
-                                    return thisIssue + req.getNumTokens() -1;
+                                    return thisIssue + req.getNumTokens() - 1;
                                 }
                                 mb.put(k, v);
-                                return Math.max(thisIssue + req.getNumTokens()-1, v);
-                        });
+                                return Math.max(thisIssue + req.getNumTokens() - 1, v);
+                            });
+                            // Still keep offset map up-to-date
+                            lastOffsetMap.compute(id, (k, v) -> {
+                                if (v == null) {
+                                    return 0L;
+                                }
+                                return v + req.getNumTokens();
+                            });
+                        }
                     }
+
                     r.sendResponse(ctx, msg,
                             new TokenResponseMsg(thisIssue, mb.build()));
                 }

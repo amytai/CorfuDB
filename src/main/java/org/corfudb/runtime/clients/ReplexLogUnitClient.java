@@ -12,7 +12,6 @@ import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.ReadResult;
 import org.corfudb.runtime.exceptions.OutOfSpaceException;
 import org.corfudb.runtime.exceptions.OverwriteException;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -102,21 +101,18 @@ public class ReplexLogUnitClient implements IClient {
     /**
      * Asynchronously write to the logging unit.
      *
-     * @param address           The address to write to.
-     * @param streams           The streams, if any, that this write belongs to.
+     * @param streamID          Stream to which write belongs
+     * @param offset            Local offset in the given stream that this entry is written to.
      * @param rank              The rank of this write (used for quorum replication).
      * @param writeObject       The object, pre-serialization, to write.
-     * @param backpointerMap    The map of backpointers to write.
      * @return A CompletableFuture which will complete with the WriteResult once the
      * write completes.
      */
-    public CompletableFuture<Boolean> write(long address, Set<UUID> streams, long rank,
-                                            Object writeObject, Map<UUID,Long> backpointerMap)
+    public CompletableFuture<Boolean> write(UUID streamID, long offset, long rank,
+                                            Object writeObject)
     {
-        LogUnitWriteMsg w = new LogUnitWriteMsg(address);
-        w.setStreams(streams);
+        ReplexLogUnitWriteMsg w = new ReplexLogUnitWriteMsg(streamID, offset);
         w.setRank(rank);
-        w.setBackpointerMap(backpointerMap);
         w.setPayload(writeObject);
         return router.sendMessageAndGetCompletable(w);
     }
@@ -143,6 +139,14 @@ public class ReplexLogUnitClient implements IClient {
         return router.sendMessageAndGetCompletable(w);
     }
 
+    public CompletableFuture<Boolean> writeCommit(UUID streamID, long offset, boolean commit)
+    {
+        ReplexCommitMsg m = new ReplexCommitMsg(streamID, offset);
+        m.setReplexCommit(commit);
+        return router.sendMessageAndGetCompletable(m);
+    }
+
+
     /**
      * Asynchronously read from the logging unit.
      *
@@ -152,7 +156,7 @@ public class ReplexLogUnitClient implements IClient {
      * completes.
      */
     public CompletableFuture<ReadResult> read(UUID streamID, long offset) {
-        return router.sendMessageAndGetCompletable(new LogUnitStreamReadRequestMsg(streamID, offset));
+        return router.sendMessageAndGetCompletable(new ReplexLogUnitReadRequestMsg(streamID, offset));
     }
 
     /**

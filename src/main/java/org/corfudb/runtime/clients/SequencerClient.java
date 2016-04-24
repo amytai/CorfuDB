@@ -57,9 +57,12 @@ public class SequencerClient implements IClient {
                     .add(CorfuMsg.CorfuMsgType.TOKEN_RES)
                     .build();
 
-
-    public CompletableFuture<TokenResponse> nextToken(Set<UUID> streamIDs, long numTokens)
+    public CompletableFuture<TokenResponse> nextToken(Set<UUID> streamIDs, long numTokens, boolean replex)
     {
+        if (replex) {
+            return router.sendMessageAndGetCompletable(
+                    new TokenRequestMsg(streamIDs, numTokens, TokenRequestMsg.flagsFromShort((short)2)));
+        }
         return router.sendMessageAndGetCompletable(
                 new TokenRequestMsg(streamIDs, numTokens));
     }

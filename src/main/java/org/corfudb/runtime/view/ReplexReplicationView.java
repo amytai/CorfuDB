@@ -51,15 +51,42 @@ public class ReplexReplicationView extends AbstractReplicationView {
             Serializers.getSerializer(Serializers.SerializerType.CORFU)
                     .serialize(data, b);
             payloadBytes = b.readableBytes();
-                for (int i = 0; i < numUnits; i++)
-                {
-                    log.trace("Write[{}]: chain {}/{}", address, i+1, numUnits);
-                    // In chain replication, we write synchronously to every unit in the chain.
-                        CFUtils.getUninterruptibly(
-                                getLayout().getLogUnitClient(address, i)
-                                        .write(getLayout().getLocalAddress(address), stream, 0L, data, Collections.emptyMap()), OverwriteException.class);
+            // First write to all the primary index units
+            for (int i = 0; i < numUnits; i++)
+            {
+                log.trace("Write, Global[{}]: chain {}/{}", address, i+1, numUnits);
+                CFUtils.getUninterruptibly(
+                        getLayout().getLogUnitClient(address, i)
+                                .write(getLayout().getLocalAddress(address), stream, 0L, data, Collections.emptyMap()), OverwriteException.class);
+            }
+            // Write to the secondary / stream index units.
+            for (UUID streamID : stream) {
+                int numReplexUnits = getLayout().getStripe(streamID).getLogServers().size();
+                for (int i = 0; i < numReplexUnits; i++) {
+                    log.trace("Write, Replex[{}, {}]: chain {}/{}", address, i, numReplexUnits);
+                    CFUtils.getUninterruptibly(
+                            getLayout().getReplexLogUnitClient(streamID, i)
+                                    .write(streamID, backpointerMap.get(streamID), 0L, data), OverwriteException.class);
                 }
-            // TODO: Now we have to write the ACK bits.
+            }
+            // Now we write the COMMIT bits.
+            for (int i = 0; i < numUnits; i++)
+            {
+                log.trace("Write, Global[{}]: chain {}/{}", address, i+1, numUnits);
+                CFUtils.getUninterruptibly(
+                        getLayout().getLogUnitClient(address, i)
+                                .writeCommit(getLayout().getLocalAddress(address), true), null);
+            }
+            // Write to the secondary / stream index units.
+            for (UUID streamID : stream) {
+                int numReplexUnits = getLayout().getStripe(streamID).getLogServers().size();
+                for (int i = 0; i < numReplexUnits; i++) {
+                    log.trace("Write, Replex[{}, {}]: chain {}/{}", address, i, numReplexUnits);
+                    CFUtils.getUninterruptibly(
+                            getLayout().getReplexLogUnitClient(streamID, i)
+                                    .writeCommit(streamID, backpointerMap.get(streamID), true), null);
+                }
+            }
         }
         return payloadBytes;
     }

@@ -14,17 +14,16 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-public class ReplexLogUnitFillHoleMsg extends CorfuMsg {
+public class ReplexLogUnitReadRequestMsg extends CorfuMsg {
 
-
-    /** The Replex address to fill the hole at. */
+    /** Stream address are tuples (streamID, offset), where offset is the local offset within the stream. */
     UUID streamID;
     long offset;
 
-    public ReplexLogUnitFillHoleMsg(UUID streamID, long offset)
+    public ReplexLogUnitReadRequestMsg(UUID streamID, long offset)
     {
-        this.msgType = CorfuMsgType.REPLEX_FILL_HOLE;
-        this.streamID  = streamID;
+        this.msgType = CorfuMsgType.REPLEX_READ_REQUEST;
+        this.streamID = streamID;
         this.offset = offset;
     }
     /**

@@ -4,8 +4,9 @@ import io.netty.buffer.ByteBuf;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 
-import java.util.UUID;
+import java.util.*;
 
 
 /**
@@ -14,25 +15,30 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-public class ReplexLogUnitFillHoleMsg extends CorfuMsg {
+@ToString(callSuper=true)
+public class ReplexCommitMsg extends LogUnitMetadataMsg {
 
 
-    /** The Replex address to fill the hole at. */
+    /** The streamID and local offset to write commit bit. */
     UUID streamID;
     long offset;
 
-    public ReplexLogUnitFillHoleMsg(UUID streamID, long offset)
+    public ReplexCommitMsg(UUID streamID, long offset)
     {
-        this.msgType = CorfuMsgType.REPLEX_FILL_HOLE;
-        this.streamID  = streamID;
+        this.msgType = CorfuMsgType.REPLEX_COMMIT;
+        this.streamID = streamID;
         this.offset = offset;
+        this.metadataMap = new EnumMap<>(IMetadata.LogUnitMetadataType.class);
     }
+
+
     /**
      * Serialize the message into the given bytebuffer.
      *
      * @param buffer The buffer to serialize to.
      */
     @Override
+    @SuppressWarnings("unchecked")
     public void serialize(ByteBuf buffer) {
         super.serialize(buffer);
         buffer.writeLong(streamID.getMostSignificantBits());

@@ -5,17 +5,12 @@ import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.TreeRangeSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.gson.Gson;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import javafx.util.Pair;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.protocols.wireprotocol.*;
 import org.corfudb.util.Utils;
-import org.corfudb.util.retry.IRetry;
 import org.corfudb.util.retry.IntervalAndSentinelRetry;
 
 import java.io.*;
@@ -23,11 +18,6 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.nio.charset.Charset;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,7 +25,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.ReadResultType;
 import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.LogUnitEntry;
-import org.corfudb.util.serializer.Serializers;
 
 /**
  * Created by amytai on 4/13/15.
@@ -392,15 +381,15 @@ public class ReplexServer implements IServer {
 
     @Override
     public void handleMessage(CorfuMsg msg, ChannelHandlerContext ctx, IServerRouter r) {
-        switch(msg.getMsgType())
-        {
-            case WRITE:
-                LogUnitWriteMsg writeMsg = (LogUnitWriteMsg) msg;
-                log.trace("Handling write request for address {}", writeMsg.getAddress());
+        switch(msg.getMsgType()) {
+            case REPLEX_WRITE:
+                ReplexLogUnitWriteMsg writeMsg = (ReplexLogUnitWriteMsg) msg;
+                log.trace("Handling write request for address ({}, {})", writeMsg.getStreamID(),
+                        writeMsg.getOffset());
                 write(writeMsg, ctx, r);
                 break;
-            case READ_REQUEST:
-                LogUnitStreamReadRequestMsg readMsg = (LogUnitStreamReadRequestMsg) msg;
+            case REPLEX_READ_REQUEST:
+                ReplexLogUnitReadRequestMsg readMsg = (ReplexLogUnitReadRequestMsg) msg;
                 log.trace("Handling read request for address ({}, {})", readMsg.getStreamID(), readMsg.getOffset());
                 read(readMsg, ctx, r);
                 break;
@@ -422,8 +411,7 @@ public class ReplexServer implements IServer {
 //                gcThread.interrupt();
 //            }
 //            break;
-            case FILL_HOLE:
-            {
+            case REPLEX_FILL_HOLE: {
                 ReplexLogUnitFillHoleMsg m = (ReplexLogUnitFillHoleMsg) msg;
                 log.debug("Hole fill requested at ({}, {})", m.getStreamID(), m.getOffset());
                 //TODO: use get or getIsPresent?
@@ -431,6 +419,21 @@ public class ReplexServer implements IServer {
                 r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
             }
             break;
+            case REPLEX_COMMIT:
+            {
+                ReplexCommitMsg m = (ReplexCommitMsg) msg;
+                log.debug("Setting commit bit at ({}, {}) to {}", m.getStreamID(), m.getOffset(),
+                        m.getMetadataMap().get(IMetadata.LogUnitMetadataType.REPLEX_COMMIT));
+                Pair key = new Pair(m.getStreamID(), m.getOffset());
+                LogUnitEntry e = dataCache.getIfPresent(key);
+                if (e == null) {
+                    r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
+                } else {
+                    e.setReplexCommit(m.getReplexCommit());
+                    r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
+                }
+
+            }
 //            case TRIM:
 //            {
 //                LogUnitTrimMsg m = (LogUnitTrimMsg) msg;
@@ -631,7 +634,7 @@ public class ReplexServer implements IServer {
     }
 
     /** Service an incoming read request. */
-    public void read(LogUnitStreamReadRequestMsg msg, ChannelHandlerContext ctx, IServerRouter r)
+    public void read(ReplexLogUnitReadRequestMsg msg, ChannelHandlerContext ctx, IServerRouter r)
     {
         log.trace("Read[{}, {}]", msg.getStreamID(), msg.getOffset());
         /*if (trimRange.contains (msg.getAddress()))
@@ -672,27 +675,27 @@ public class ReplexServer implements IServer {
     }*/
 
     /** Service an incoming write request. */
-    public void write(LogUnitWriteMsg msg, ChannelHandlerContext ctx, IServerRouter r)
+    public void write(ReplexLogUnitWriteMsg msg, ChannelHandlerContext ctx, IServerRouter r)
     {
-        log.trace("Write[{}]", msg.getAddress());
+        log.trace("Write[{}, {}]", msg.getStreamID(), msg.getOffset());
+        // TODO: Check for Replex trims.
         //TODO: locking of trimRange.
-        if (trimRange.contains (msg.getAddress()))
+        /*if (trimRange.contains (msg.getAddress()))
         {
             r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_TRIMMED));
         }
-        else {
+        else {*/
             LogUnitEntry e = new LogUnitEntry(msg.getData(), msg.getMetadataMap(), false);
             e.getBuffer().retain();
             try {
-                //TODO: DO THE ACTUAL WRITE.
-                //dataCache.put(msg.getAddress(), e);
+                dataCache.put(new Pair(msg.getStreamID(), msg.getOffset()), e);
                 r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_OK));
             } catch (Exception ex)
             {
                 r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_OVERWRITE));
                 e.getBuffer().release();
             }
-        }
+        //}
     }
 
 //    public void runGC()

@@ -142,6 +142,13 @@ public class LogUnitClient implements IClient {
         return router.sendMessageAndGetCompletable(w);
     }
 
+    public CompletableFuture<Boolean> writeCommit(long address, boolean commit)
+    {
+        LogUnitCommitMsg m = new LogUnitCommitMsg(address);
+        m.setReplexCommit(commit);
+        return router.sendMessageAndGetCompletable(m);
+    }
+
     /**
      * Asynchronously read from the logging unit.
      *
