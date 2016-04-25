@@ -297,6 +297,9 @@ public class LogUnitServer implements IServer {
         throws IOException
     {
         ByteBuf metadataBuffer = Unpooled.buffer();
+        // ALWAYS set aside room for the REPLEX_COMMIT bit
+        entry.getMetadataMap().putIfAbsent(IMetadata.LogUnitMetadataType.REPLEX_COMMIT, false);
+
         LogUnitMetadataMsg.bufferFromMap(metadataBuffer, entry.getMetadataMap());
         int entrySize = entry.getBuffer().writerIndex() + metadataBuffer.writerIndex() + 24;
         long pos = fh.getFilePointer().getAndAdd(entrySize);
@@ -352,7 +355,8 @@ public class LogUnitServer implements IServer {
                 return new LogUnitEntry(Unpooled.wrappedBuffer(dBuf),
                         LogUnitMetadataMsg.mapFromBuffer(mBuf),
                         false,
-                        true);
+                        true,
+                        false);
             }
         }
         return null;
@@ -465,6 +469,15 @@ public class LogUnitServer implements IServer {
                 }
             }
             break;
+            case LOG_REPLEX_COMMIT: {
+                LogUnitCommitMsg m = (LogUnitCommitMsg) msg;
+                log.info("Received commit bit of {} for address: {}", m.getReplexCommit(), m.getAddress());
+                LogUnitEntry e = dataCache.get(((LogUnitCommitMsg) msg).getAddress());
+                e.setReplexCommit(((LogUnitCommitMsg) msg).getReplexCommit());
+                e.setDirty(true);
+                r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
+            }
+            break;
         }
     }
 
@@ -514,6 +527,26 @@ public class LogUnitServer implements IServer {
                                     }
                                 } else {
                                     throw new Exception("overwrite");
+                                }
+                                log.info("Disk_write[{}]: Written to disk.", address);
+                            } catch (Exception e) {
+                                log.error("Disk_write[{}]: Exception", address, e);
+                                throw new RuntimeException(e);
+                            }
+                        } else if (entry.isDirty) {
+                            // TODO: An optimization simply writes the new commit bit, rather than the whole entry.
+                            try {
+                                FileHandle fh = getChannelForAddress(address);
+                                if ((Boolean) opts.get("--sync")) {
+                                    writeEntry(fh, address, entry);
+                                } else {
+                                    CompletableFuture.runAsync(() -> {
+                                        try {
+                                            writeEntry(fh, address, entry);
+                                        } catch (Exception e) {
+                                            log.error("Disk_write[{}]: Exception", address, e);
+                                        }
+                                    });
                                 }
                                 log.info("Disk_write[{}]: Written to disk.", address);
                             } catch (Exception e) {

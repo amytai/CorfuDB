@@ -48,6 +48,8 @@ public class LogUnitReadResponseMsg extends LogUnitPayloadMsg {
         public final EnumMap<IMetadata.LogUnitMetadataType, Object> metadataMap;
         public final boolean isHole;
         public boolean isPersisted;
+        public boolean isDirty; // This bit isn't persisted; only for cache-use only so we know whether
+                                // to update the REPLEX_COMMIT bit.
 
         /** Generate a new log unit entry which is a hole */
         public LogUnitEntry()
@@ -56,6 +58,7 @@ public class LogUnitReadResponseMsg extends LogUnitPayloadMsg {
             metadataMap = new EnumMap<>(IMetadata.LogUnitMetadataType.class);
             isHole = true;
             isPersisted = false;
+            isDirty = false;
         }
     }
 

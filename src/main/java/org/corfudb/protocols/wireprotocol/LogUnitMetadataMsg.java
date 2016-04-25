@@ -83,6 +83,9 @@ public abstract class LogUnitMetadataMsg extends CorfuMsg implements IMetadata {
                     metadataMap.put(LogUnitMetadataType.BACKPOINTER_MAP, mb.build());
                 }
                     break;
+                case REPLEX_COMMIT:
+                    metadataMap.put(LogUnitMetadataType.REPLEX_COMMIT, buffer.readBoolean());
+                    break;
             }
             numEntries--;
         }
@@ -119,6 +122,9 @@ public abstract class LogUnitMetadataMsg extends CorfuMsg implements IMetadata {
                                     buffer.writeLong(e.getKey().getLeastSignificantBits());
                                     buffer.writeLong(e.getValue());
                                 });
+                        break;
+                    case REPLEX_COMMIT:
+                        buffer.writeBoolean((boolean) metadataMap.get(t));
                         break;
                 }
             }
