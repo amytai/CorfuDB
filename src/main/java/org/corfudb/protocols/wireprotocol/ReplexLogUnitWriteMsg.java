@@ -19,15 +19,13 @@ import java.util.*;
 public class ReplexLogUnitWriteMsg extends LogUnitPayloadMsg {
 
 
-    /** The streamID and local offset to write to. */
-    UUID streamID;
-    long offset;
+    /** The map reprsents a set of (streamID, local offset) streamPairs that the entry should be written to. */
+    Map<UUID, Long> streamPairs;
 
-    public ReplexLogUnitWriteMsg(UUID streamID, long offset)
+    public ReplexLogUnitWriteMsg(Map<UUID, Long> streamPairs)
     {
         this.msgType = CorfuMsgType.REPLEX_WRITE;
-        this.streamID = streamID;
-        this.offset = offset;
+        this.streamPairs = streamPairs;
         this.metadataMap = new EnumMap<>(IMetadata.LogUnitMetadataType.class);
     }
 
@@ -41,9 +39,13 @@ public class ReplexLogUnitWriteMsg extends LogUnitPayloadMsg {
     @SuppressWarnings("unchecked")
     public void serialize(ByteBuf buffer) {
         super.serialize(buffer);
-        buffer.writeLong(streamID.getMostSignificantBits());
-        buffer.writeLong(streamID.getLeastSignificantBits());
-        buffer.writeLong(offset);
+        buffer.writeInt(streamPairs.size());
+        for (UUID streamID : streamPairs.keySet()) {
+            buffer.writeLong(streamID.getMostSignificantBits());
+            buffer.writeLong(streamID.getLeastSignificantBits());
+            buffer.writeLong(streamPairs.get(streamID));
+
+        }
     }
 
     /**
@@ -55,7 +57,10 @@ public class ReplexLogUnitWriteMsg extends LogUnitPayloadMsg {
     @Override
     public void fromBuffer(ByteBuf buffer) {
         super.fromBuffer(buffer);
-        streamID = new UUID(buffer.readLong(), buffer.readLong());
-        offset = buffer.readLong();
+        int size = buffer.readInt();
+        streamPairs = new HashMap<>();
+        for (int i = 0; i < size; i++) {
+            streamPairs.put(new UUID(buffer.readLong(), buffer.readLong()), buffer.readLong());
+        }
     }
 }

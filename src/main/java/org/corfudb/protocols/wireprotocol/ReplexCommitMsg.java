@@ -20,14 +20,12 @@ public class ReplexCommitMsg extends LogUnitMetadataMsg {
 
 
     /** The streamID and local offset to write commit bit. */
-    UUID streamID;
-    long offset;
+    Map<UUID, Long> streamPairs;
 
-    public ReplexCommitMsg(UUID streamID, long offset)
+    public ReplexCommitMsg(Map<UUID, Long> streamPairs)
     {
         this.msgType = CorfuMsgType.REPLEX_COMMIT;
-        this.streamID = streamID;
-        this.offset = offset;
+        this.streamPairs = streamPairs;
         this.metadataMap = new EnumMap<>(IMetadata.LogUnitMetadataType.class);
     }
 
@@ -41,9 +39,13 @@ public class ReplexCommitMsg extends LogUnitMetadataMsg {
     @SuppressWarnings("unchecked")
     public void serialize(ByteBuf buffer) {
         super.serialize(buffer);
-        buffer.writeLong(streamID.getMostSignificantBits());
-        buffer.writeLong(streamID.getLeastSignificantBits());
-        buffer.writeLong(offset);
+        buffer.writeInt(streamPairs.size());
+        for (UUID streamID : streamPairs.keySet()) {
+            buffer.writeLong(streamID.getMostSignificantBits());
+            buffer.writeLong(streamID.getLeastSignificantBits());
+            buffer.writeLong(streamPairs.get(streamID));
+
+        }
     }
 
     /**
@@ -55,7 +57,10 @@ public class ReplexCommitMsg extends LogUnitMetadataMsg {
     @Override
     public void fromBuffer(ByteBuf buffer) {
         super.fromBuffer(buffer);
-        streamID = new UUID(buffer.readLong(), buffer.readLong());
-        offset = buffer.readLong();
+        int size = buffer.readInt();
+        streamPairs = new HashMap<>();
+        for (int i = 0; i < size; i++) {
+            streamPairs.put(new UUID(buffer.readLong(), buffer.readLong()), buffer.readLong());
+        }
     }
 }

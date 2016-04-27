@@ -101,17 +101,19 @@ public class ReplexLogUnitClient implements IClient {
     /**
      * Asynchronously write to the logging unit.
      *
-     * @param streamID          Stream to which write belongs
-     * @param offset            Local offset in the given stream that this entry is written to.
+     * It is assumed that the calling function ensures that all streams in streamPairs.keySet() hash to the log unit
+     * connected to this client.
+     *
+     * @param streamPairs       Map of stream address that this entry should be written to.
      * @param rank              The rank of this write (used for quorum replication).
      * @param writeObject       The object, pre-serialization, to write.
      * @return A CompletableFuture which will complete with the WriteResult once the
      * write completes.
      */
-    public CompletableFuture<Boolean> write(UUID streamID, long offset, long rank,
+    public CompletableFuture<Boolean> write(Map<UUID, Long> streamPairs, long rank,
                                             Object writeObject)
     {
-        ReplexLogUnitWriteMsg w = new ReplexLogUnitWriteMsg(streamID, offset);
+        ReplexLogUnitWriteMsg w = new ReplexLogUnitWriteMsg(streamPairs);
         w.setRank(rank);
         w.setPayload(writeObject);
         return router.sendMessageAndGetCompletable(w);
@@ -139,9 +141,9 @@ public class ReplexLogUnitClient implements IClient {
         return router.sendMessageAndGetCompletable(w);
     }
 
-    public CompletableFuture<Boolean> writeCommit(UUID streamID, long offset, boolean commit)
+    public CompletableFuture<Boolean> writeCommit(Map<UUID, Long> streamPairs, boolean commit)
     {
-        ReplexCommitMsg m = new ReplexCommitMsg(streamID, offset);
+        ReplexCommitMsg m = new ReplexCommitMsg(streamPairs);
         m.setReplexCommit(commit);
         return router.sendMessageAndGetCompletable(m);
     }

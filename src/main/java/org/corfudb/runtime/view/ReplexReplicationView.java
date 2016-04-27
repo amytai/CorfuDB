@@ -59,14 +59,27 @@ public class ReplexReplicationView extends AbstractReplicationView {
                         getLayout().getLogUnitClient(address, i)
                                 .write(getLayout().getLocalAddress(address), stream, 0L, data, Collections.emptyMap()), OverwriteException.class);
             }
-            // Write to the secondary / stream index units.
+            // Write to the secondary / stream index units. To reduce the amount of network traffic, aggregate all
+            // streams that hash to the same logging unit in one write.
+            List<Map<UUID, Long>> streamPairs = new ArrayList<Map<UUID, Long>>(getLayout().getNumberOfReplexStripes());
             for (UUID streamID : stream) {
-                int numReplexUnits = getLayout().getStripe(streamID).getLogServers().size();
-                for (int i = 0; i < numReplexUnits; i++) {
-                    log.trace("Write, Replex[{}, {}]: chain {}/{}", address, i, numReplexUnits);
+                if (streamPairs.get(getLayout().getStripeIndex(streamID)) == null) {
+                    HashMap<UUID, Long> newMap = new HashMap<UUID, Long>();
+                    newMap.put(streamID, backpointerMap.get(streamID));
+                    streamPairs.set(getLayout().getStripeIndex(streamID), newMap);
+                } else {
+                    streamPairs.get(getLayout().getStripeIndex(streamID)).put(streamID, backpointerMap.get(streamID));
+                }
+            }
+
+            for (int i = 0; i < streamPairs.size(); i++) {
+                int numReplexUnits = getLayout().getSegments().get(getLayout().getSegments().size() - 1)
+                        .getReplexStripes().get(i).getLogServers().size();
+                for (int j = 0; j < numReplexUnits; j++) {
+                    log.trace("Write, Replex[{}, {}]: chain {}/{}", address, j, numReplexUnits);
                     CFUtils.getUninterruptibly(
-                            getLayout().getReplexLogUnitClient(streamID, i)
-                                    .write(streamID, backpointerMap.get(streamID), 0L, data), OverwriteException.class);
+                            getLayout().getReplexLogUnitClientByIndex(i, j)
+                                    .write(streamPairs.get(i), 0L, data), OverwriteException.class);
                 }
             }
             // Now we write the COMMIT bits.
@@ -78,13 +91,14 @@ public class ReplexReplicationView extends AbstractReplicationView {
                                 .writeCommit(getLayout().getLocalAddress(address), true), null);
             }
             // Write to the secondary / stream index units.
-            for (UUID streamID : stream) {
-                int numReplexUnits = getLayout().getStripe(streamID).getLogServers().size();
-                for (int i = 0; i < numReplexUnits; i++) {
-                    log.trace("Write, Replex[{}, {}]: chain {}/{}", address, i, numReplexUnits);
+            for (int i = 0; i < streamPairs.size(); i++) {
+                int numReplexUnits = getLayout().getSegments().get(getLayout().getSegments().size() - 1)
+                        .getReplexStripes().get(i).getLogServers().size();
+                for (int j = 0; j < numReplexUnits; j++) {
+                    log.trace("Write, Replex[{}, {}]: chain {}/{}", address, j, numReplexUnits);
                     CFUtils.getUninterruptibly(
-                            getLayout().getReplexLogUnitClient(streamID, i)
-                                    .writeCommit(streamID, backpointerMap.get(streamID), true), null);
+                            getLayout().getReplexLogUnitClientByIndex(i, j)
+                                    .writeCommit(streamPairs.get(i), true), null);
                 }
             }
         }

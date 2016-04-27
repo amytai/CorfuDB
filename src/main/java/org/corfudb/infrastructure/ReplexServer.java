@@ -384,8 +384,7 @@ public class ReplexServer implements IServer {
         switch(msg.getMsgType()) {
             case REPLEX_WRITE:
                 ReplexLogUnitWriteMsg writeMsg = (ReplexLogUnitWriteMsg) msg;
-                log.trace("Handling write request for address ({}, {})", writeMsg.getStreamID(),
-                        writeMsg.getOffset());
+                log.trace("Handling write request for {} addresses)", writeMsg.getStreamPairs().size());
                 write(writeMsg, ctx, r);
                 break;
             case REPLEX_READ_REQUEST:
@@ -422,16 +421,16 @@ public class ReplexServer implements IServer {
             case REPLEX_COMMIT:
             {
                 ReplexCommitMsg m = (ReplexCommitMsg) msg;
-                log.debug("Setting commit bit at ({}, {}) to {}", m.getStreamID(), m.getOffset(),
+                log.debug("Setting commit bit at {} local stream addresses to {}", m.getStreamPairs().size(),
                         m.getMetadataMap().get(IMetadata.LogUnitMetadataType.REPLEX_COMMIT));
-                Pair key = new Pair(m.getStreamID(), m.getOffset());
-                LogUnitEntry e = dataCache.getIfPresent(key);
-                if (e == null) {
-                    r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
-                } else {
+                for (UUID streamID : m.getStreamPairs().keySet()) {
+                    Pair key = new Pair(streamID, m.getStreamPairs().get(streamID));
+                    LogUnitEntry e = dataCache.getIfPresent(key);
+                    if (e == null)
+                        continue;
                     e.setReplexCommit(m.getReplexCommit());
-                    r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
                 }
+                r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
 
             }
 //            case TRIM:
@@ -677,7 +676,7 @@ public class ReplexServer implements IServer {
     /** Service an incoming write request. */
     public void write(ReplexLogUnitWriteMsg msg, ChannelHandlerContext ctx, IServerRouter r)
     {
-        log.trace("Write[{}, {}]", msg.getStreamID(), msg.getOffset());
+        log.trace("Write for {} replex address", msg.getStreamPairs().size());
         // TODO: Check for Replex trims.
         //TODO: locking of trimRange.
         /*if (trimRange.contains (msg.getAddress()))
@@ -685,16 +684,22 @@ public class ReplexServer implements IServer {
             r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_TRIMMED));
         }
         else {*/
+        for (UUID streamID : msg.getStreamPairs().keySet()) {
             LogUnitEntry e = new LogUnitEntry(msg.getData(), msg.getMetadataMap(), false);
             e.getBuffer().retain();
             try {
-                dataCache.put(new Pair(msg.getStreamID(), msg.getOffset()), e);
-                r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_OK));
-            } catch (Exception ex)
-            {
+                dataCache.put(new Pair(streamID, msg.getStreamPairs().get(streamID)), e);
+            } catch (Exception ex) {
+                // If a single one of the stream writes is an overwrite, then the whole thing gets aborted.
+                // We don't have to worry about removing the writes from the cache, because the commit bit will never be
+                // true.
+                // TODO: Have a callback that acts on the Overwrite and set bits to aborted / false.
                 r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_OVERWRITE));
                 e.getBuffer().release();
+                return;
             }
+        }
+        r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_OK));
         //}
     }
 

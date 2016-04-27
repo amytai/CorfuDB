@@ -177,6 +177,16 @@ public class Layout implements Cloneable {
         return ls.getReplexStripes().get(streamID.hashCode() % ls.getNumberOfReplexStripes());
     }
 
+    public int getStripeIndex(UUID streamID) {
+        LayoutSegment ls = segments.get(segments.size()-1);
+        return streamID.hashCode() % ls.getNumberOfReplexStripes();
+    }
+
+    public int getNumberOfReplexStripes() {
+        LayoutSegment ls = segments.get(segments.size()-1);
+        return ls.getNumberOfReplexStripes();
+    }
+
     public LayoutSegment getSegment(long globalAddress)
     {
         for (LayoutSegment ls : segments)
@@ -230,6 +240,12 @@ public class Layout implements Cloneable {
     public ReplexLogUnitClient getReplexLogUnitClient(UUID streamID, int index)
     {
         return runtime.getRouter(getStripe(streamID).getLogServers().get(index)).getClient(ReplexLogUnitClient.class);
+    }
+
+    public ReplexLogUnitClient getReplexLogUnitClientByIndex(int hashedIndex, int index) {
+        LayoutSegment ls = segments.get(segments.size()-1);
+        return runtime.getRouter(ls.getReplexStripes().get(hashedIndex).getLogServers().get(index))
+                .getClient(ReplexLogUnitClient.class);
     }
 
     /** Get the layout as a JSON string. */
