@@ -108,5 +108,12 @@ public class SequencerViewTest extends AbstractViewTest {
         map = r.getSequencerView().nextTokenWrapper(streams, 1, true).getBackpointerMap();
         assertThat(map).containsEntry(streamA, 4L);
         assertThat(map).containsEntry(streamB, 1L);
+
+        map = r.getSequencerView().nextTokenWrapper(streams, 0, true).getBackpointerMap();
+        assertThat(map).containsEntry(streamA, 4L);
+        assertThat(map).containsEntry(streamB, 1L);
+
+        map = r.getSequencerView().nextTokenWrapper(streams, 0, false).getBackpointerMap();
+        assertThat(map).isEmpty();
     }
 }

@@ -79,15 +79,18 @@ public class CorfuMsg {
         REPLEX_COMMIT(43, ReplexCommitMsg.class, ReplexServer.class),
         REPLEX_FILL_HOLE(44, ReplexLogUnitFillHoleMsg.class, ReplexServer.class),
         REPLEX_READ_REQUEST(45, ReplexLogUnitReadRequestMsg.class, ReplexServer.class),
-        REPLEX_WRITE(46, ReplexLogUnitWriteMsg.class, ReplexServer.class),
-        LOG_REPLEX_COMMIT(47, LogUnitCommitMsg.class, LogUnitServer.class),
+        REPLEX_READ_RESPONSE(46, ReplexLogUnitReadResponseMsg.class, ReplexServer.class),
+        REPLEX_WRITE(47, ReplexLogUnitWriteMsg.class, ReplexServer.class),
+        REPLEX_SEEK(48, ReplexLogUnitSeekRequestMsg.class, ReplexServer.class),
+        REPLEX_SEEK_RESPONSE(49, ReplexLogUnitSeekResponseMsg.class, ReplexServer.class),
+        LOG_REPLEX_COMMIT(50, LogUnitCommitMsg.class, LogUnitServer.class),
 
         // Logging Unit Error Codes
-        ERROR_OK(50, CorfuMsg.class, LogUnitServer.class),
-        ERROR_TRIMMED(51, CorfuMsg.class, LogUnitServer.class),
-        ERROR_OVERWRITE(52, CorfuMsg.class, LogUnitServer.class),
-        ERROR_OOS(53, CorfuMsg.class, LogUnitServer.class),
-        ERROR_RANK(54, CorfuMsg.class, LogUnitServer.class)
+        ERROR_OK(60, CorfuMsg.class, LogUnitServer.class),
+        ERROR_TRIMMED(61, CorfuMsg.class, LogUnitServer.class),
+        ERROR_OVERWRITE(62, CorfuMsg.class, LogUnitServer.class),
+        ERROR_OOS(63, CorfuMsg.class, LogUnitServer.class),
+        ERROR_RANK(64, CorfuMsg.class, LogUnitServer.class)
         ;
 
         public final int type;

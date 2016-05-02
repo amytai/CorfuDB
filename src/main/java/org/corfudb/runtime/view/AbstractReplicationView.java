@@ -162,4 +162,7 @@ public abstract class AbstractReplicationView {
         throw new UnsupportedOperationException("This log unit doesn't implement fillStreamHole");
     }
 
+    public ILogUnitEntry seek(long globalAddress, UUID streamID, long maxLocalOffset) {
+        throw new UnsupportedOperationException("This log unit doesn't implement fetch");
+    }
 }

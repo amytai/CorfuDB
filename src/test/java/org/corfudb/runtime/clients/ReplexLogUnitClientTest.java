@@ -46,7 +46,7 @@ public class ReplexLogUnitClientTest extends AbstractClientTest {
     throws Exception
     {
         byte[] testString = "hello world".getBytes();
-        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 0L), 0, testString).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 0L), 0L, 0, testString).get();
         LogUnitReadResponseMsg.ReadResult r = client.read(CorfuRuntime.getStreamID("a"), 0L).get();
         assertThat(r.getResultType())
                 .isEqualTo(LogUnitReadResponseMsg.ReadResultType.DATA);
@@ -57,7 +57,7 @@ public class ReplexLogUnitClientTest extends AbstractClientTest {
     @Test
     public void canReadCommitBit() throws Exception {
         byte[] testString = "hello world".getBytes();
-        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 0L), 0, testString).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 0L), 0L, 0, testString).get();
 
         LogUnitReadResponseMsg.ReadResult r = client.read(CorfuRuntime.getStreamID("a"), 0L).get();
         assertThat(r.getMetadataMap()).doesNotContainKey(IMetadata.LogUnitMetadataType.REPLEX_COMMIT);
@@ -74,7 +74,7 @@ public class ReplexLogUnitClientTest extends AbstractClientTest {
         HashMap<UUID, Long> streams = new HashMap();
         streams.put(CorfuRuntime.getStreamID("a"), 0L);
         streams.put(CorfuRuntime.getStreamID("b"), 0L);
-        client.write(streams, 0, testString).get();
+        client.write(streams, 0L, 0, testString).get();
         LogUnitReadResponseMsg.ReadResult r = client.read(CorfuRuntime.getStreamID("a"), 0L).get();
         assertThat(r.getResultType())
                 .isEqualTo(LogUnitReadResponseMsg.ReadResultType.DATA);
@@ -86,6 +86,45 @@ public class ReplexLogUnitClientTest extends AbstractClientTest {
                 .isEqualTo(LogUnitReadResponseMsg.ReadResultType.DATA);
         assertThat(r.getPayload())
                 .isEqualTo(testString);
+    }
+
+    @Test
+    public void seekCorrectly() throws Exception {
+        byte[] testString0 = "hello world0".getBytes();
+        byte[] testString1 = "hello world1".getBytes();
+        byte[] testString2 = "hello world2".getBytes();
+        byte[] testString3 = "hello world3".getBytes();
+        HashMap<UUID, Long> streams = new HashMap();
+        streams.put(CorfuRuntime.getStreamID("a"), 0L);
+        streams.put(CorfuRuntime.getStreamID("b"), 0L);
+
+        client.write(streams, 0L, 0, testString0).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 1L), 1L, 0, testString1).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("b"), 1L), 2L, 0, testString2).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 2L), 3L, 0, testString3).get();
+
+        LogUnitReadResponseMsg.ReplexSeekResult r = client.seek(1L, CorfuRuntime.getStreamID("a"), 2L).get();
+        assertThat(r.getResultType())
+                .isEqualTo(LogUnitReadResponseMsg.ReadResultType.DATA);
+        assertThat(r.getPayload())
+                .isEqualTo(testString1);
+        assertThat(r.getLocalOffset()).isEqualTo(1L);
+
+        LogUnitReadResponseMsg.ReadResult rr = client.read(CorfuRuntime.getStreamID("a"), 2L).get();
+        assertThat(rr.getResultType())
+                .isEqualTo(LogUnitReadResponseMsg.ReadResultType.DATA);
+        assertThat(rr.getPayload())
+                .isEqualTo(testString3);
+        assertThat(rr.getAddress()).isEqualTo(3L);
+
+        r = client.seek(1L, CorfuRuntime.getStreamID("b"), 1L).get();
+        assertThat(r.getResultType())
+                .isEqualTo(LogUnitReadResponseMsg.ReadResultType.DATA);
+        assertThat(r.getPayload())
+                .isEqualTo(testString2);
+        assertThat(r.getLocalOffset()).isEqualTo(1L);
+        assertThat(r.getAddress()).isEqualTo(2L);
+
     }
 
 }

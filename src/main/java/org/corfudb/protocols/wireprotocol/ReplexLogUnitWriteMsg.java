@@ -19,13 +19,16 @@ import java.util.*;
 public class ReplexLogUnitWriteMsg extends LogUnitPayloadMsg {
 
 
-    /** The map reprsents a set of (streamID, local offset) streamPairs that the entry should be written to. */
+    /** The map represents a set of (streamID, local offset) streamPairs that the entry should be written to. */
     Map<UUID, Long> streamPairs;
 
-    public ReplexLogUnitWriteMsg(Map<UUID, Long> streamPairs)
+    long globalAddress;
+
+    public ReplexLogUnitWriteMsg(Map<UUID, Long> streamPairs, long globalAddress)
     {
         this.msgType = CorfuMsgType.REPLEX_WRITE;
         this.streamPairs = streamPairs;
+        this.globalAddress = globalAddress;
         this.metadataMap = new EnumMap<>(IMetadata.LogUnitMetadataType.class);
     }
 
@@ -39,12 +42,12 @@ public class ReplexLogUnitWriteMsg extends LogUnitPayloadMsg {
     @SuppressWarnings("unchecked")
     public void serialize(ByteBuf buffer) {
         super.serialize(buffer);
+        buffer.writeLong(globalAddress);
         buffer.writeInt(streamPairs.size());
         for (UUID streamID : streamPairs.keySet()) {
             buffer.writeLong(streamID.getMostSignificantBits());
             buffer.writeLong(streamID.getLeastSignificantBits());
             buffer.writeLong(streamPairs.get(streamID));
-
         }
     }
 
@@ -57,6 +60,7 @@ public class ReplexLogUnitWriteMsg extends LogUnitPayloadMsg {
     @Override
     public void fromBuffer(ByteBuf buffer) {
         super.fromBuffer(buffer);
+        globalAddress = buffer.readLong();
         int size = buffer.readInt();
         streamPairs = new HashMap<>();
         for (int i = 0; i < size; i++) {

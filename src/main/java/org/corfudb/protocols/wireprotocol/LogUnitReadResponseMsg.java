@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 @ToString
 public class LogUnitReadResponseMsg extends LogUnitPayloadMsg {
 
-
     @RequiredArgsConstructor
     public enum ReadResultType {
         EMPTY(0),
@@ -59,6 +58,23 @@ public class LogUnitReadResponseMsg extends LogUnitPayloadMsg {
             isHole = true;
             isPersisted = false;
             isDirty = false;
+        }
+    }
+
+    @Data
+    @RequiredArgsConstructor
+    public static class ReplexLogUnitEntry {
+        public final long globalAddress;
+        public final LogUnitEntry originalEntry;
+    }
+
+    @Data
+    public static class ReplexSeekResult extends ReadResult {
+        public long localOffset;
+
+        public ReplexSeekResult(ReplexLogUnitSeekResponseMsg msg) {
+            super(msg);
+            localOffset = msg.getStreamOffset();
         }
     }
 

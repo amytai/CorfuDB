@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.corfudb.protocols.wireprotocol.*;
 import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.ReadResult;
+import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.ReplexSeekResult;
 import org.corfudb.runtime.exceptions.OutOfSpaceException;
 import org.corfudb.runtime.exceptions.OverwriteException;
 
@@ -64,12 +65,26 @@ public class ReplexLogUnitClient implements IClient {
                 router.completeRequest(msg.getRequestID(), lr);
             }
             break;
-            case CONTIGUOUS_TAIL: {
+            /*case CONTIGUOUS_TAIL: {
                 LogUnitTailMsg m = (LogUnitTailMsg) msg;
                 router.completeRequest(msg.getRequestID(), new ContiguousTailData(m.getContiguousTail(),
                         m.getStreamAddresses()));
             }
-                break;
+            break;*/
+            case REPLEX_READ_RESPONSE: {
+                ReplexLogUnitReadResponseMsg m = (ReplexLogUnitReadResponseMsg) msg;
+                ReadResult rr = new ReadResult(m);
+                rr.setAddress(m.getGlobalAddress());
+                router.completeRequest(msg.getRequestID(), rr);
+            }
+            break;
+            case REPLEX_SEEK_RESPONSE: {
+                ReplexLogUnitSeekResponseMsg m = (ReplexLogUnitSeekResponseMsg) msg;
+                ReplexSeekResult sr = new ReplexSeekResult(m);
+                sr.setAddress(m.getGlobalAddress());
+                router.completeRequest(msg.getRequestID(), sr);
+            }
+            break;
         }
     }
 
@@ -82,14 +97,16 @@ public class ReplexLogUnitClient implements IClient {
                     .add(CorfuMsg.CorfuMsgType.READ_RESPONSE)
                     .add(CorfuMsg.CorfuMsgType.TRIM)
                     .add(CorfuMsg.CorfuMsgType.FILL_HOLE)
-                    .add(CorfuMsg.CorfuMsgType.FORCE_GC)
+                   /* .add(CorfuMsg.CorfuMsgType.FORCE_GC)
                     .add(CorfuMsg.CorfuMsgType.GC_INTERVAL)
                     .add(CorfuMsg.CorfuMsgType.FORCE_COMPACT)
                     .add(CorfuMsg.CorfuMsgType.CONTIGUOUS_TAIL)
-                    .add(CorfuMsg.CorfuMsgType.GET_CONTIGUOUS_TAIL)
+                    .add(CorfuMsg.CorfuMsgType.GET_CONTIGUOUS_TAIL)*/
                     .add(CorfuMsg.CorfuMsgType.READ_RANGE)
                     .add(CorfuMsg.CorfuMsgType.READ_RANGE_RESPONSE)
                     .add(CorfuMsg.CorfuMsgType.STREAM_READ)
+                    .add(CorfuMsg.CorfuMsgType.REPLEX_READ_RESPONSE)
+                    .add(CorfuMsg.CorfuMsgType.REPLEX_SEEK_RESPONSE)
 
                     .add(CorfuMsg.CorfuMsgType.ERROR_OK)
                     .add(CorfuMsg.CorfuMsgType.ERROR_TRIMMED)
@@ -110,10 +127,10 @@ public class ReplexLogUnitClient implements IClient {
      * @return A CompletableFuture which will complete with the WriteResult once the
      * write completes.
      */
-    public CompletableFuture<Boolean> write(Map<UUID, Long> streamPairs, long rank,
+    public CompletableFuture<Boolean> write(Map<UUID, Long> streamPairs, long globalAddress, long rank,
                                             Object writeObject)
     {
-        ReplexLogUnitWriteMsg w = new ReplexLogUnitWriteMsg(streamPairs);
+        ReplexLogUnitWriteMsg w = new ReplexLogUnitWriteMsg(streamPairs, globalAddress);
         w.setRank(rank);
         w.setPayload(writeObject);
         return router.sendMessageAndGetCompletable(w);
@@ -159,6 +176,12 @@ public class ReplexLogUnitClient implements IClient {
      */
     public CompletableFuture<ReadResult> read(UUID streamID, long offset) {
         return router.sendMessageAndGetCompletable(new ReplexLogUnitReadRequestMsg(streamID, offset));
+    }
+
+    /* Returns the LogEntry in streamID that has a global offset at least as large as and closest to globalAddress*/
+    public CompletableFuture<ReplexSeekResult> seek(long globalAddress, UUID streamID, long maxLocalOffset) {
+        return router.sendMessageAndGetCompletable(
+                new ReplexLogUnitSeekRequestMsg(globalAddress, streamID, maxLocalOffset));
     }
 
     /**

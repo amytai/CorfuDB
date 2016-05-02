@@ -308,6 +308,25 @@ public class AddressSpaceView extends AbstractView {
     }
 
     /**
+     * Return the entry in the given stream that has a globalOffset as close to or greater than globalOffset.
+     *
+     * @param globalOffset  The global address for reference.
+     * @param streamID      The stream from which to fetch the desired entry.
+     * @return              The log entry.
+     */
+    public ILogUnitEntry seek(long globalOffset, UUID streamID, long maxLocalOffset) {
+        //TODO: for now, only implemented in Replex logging units.
+        if (!runtime.replexEnabled)
+            throw new UnsupportedOperationException("Seeks are not currently supported");
+
+        return layoutHelper(l -> AbstractReplicationView
+                        .getReplicationView(l, Layout.ReplicationMode.REPLEX_REPLICATION,
+                                l.getSegments().get(l.getSegments().size()))
+                        .seek(globalOffset, streamID, maxLocalOffset)
+        ).setRuntime(runtime);
+    }
+
+    /**
      * Fill a hole at the given address.
      * @param address An address to hole fill at.
      */

@@ -44,6 +44,9 @@ public class CorfuRuntime {
     @Getter
     public int maxCacheSize = 100_000_000;
 
+    @Getter
+    public boolean replexEnabled = false;
+
     //endregion Address Space Options
 
 
@@ -70,6 +73,12 @@ public class CorfuRuntime {
     public CorfuRuntime setCacheDisabled(boolean disable)
     {
         this.cacheDisabled = disable;
+        return this;
+    }
+
+    public CorfuRuntime setReplexEnabled(boolean enable)
+    {
+        this.replexEnabled = enable;
         return this;
     }
 

@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.ReadResultType;
 import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.LogUnitEntry;
+import org.corfudb.protocols.wireprotocol.LogUnitReadResponseMsg.ReplexLogUnitEntry;
 
 /**
  * Created by amytai on 4/13/15.
@@ -132,7 +133,7 @@ public class ReplexServer implements IServer {
      * This cache services requests for data at various addresses. In a memory implementation,
      * it is not backed by anything, but in a disk implementation it is backed by persistent storage.
      */
-    Cache<Pair<UUID, Long>, LogUnitEntry> dataCache;
+    Cache<Pair<UUID, Long>, ReplexLogUnitEntry> dataCache;
 
     long maxCacheSize;
 
@@ -414,7 +415,8 @@ public class ReplexServer implements IServer {
                 ReplexLogUnitFillHoleMsg m = (ReplexLogUnitFillHoleMsg) msg;
                 log.debug("Hole fill requested at ({}, {})", m.getStreamID(), m.getOffset());
                 //TODO: use get or getIsPresent?
-                dataCache.get(new Pair(m.getStreamID(), m.getOffset()), (address) -> new LogUnitEntry());
+                dataCache.get(new Pair(m.getStreamID(), m.getOffset()),
+                        (address) -> new ReplexLogUnitEntry(-1L, new LogUnitEntry()));
                 r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
             }
             break;
@@ -425,14 +427,19 @@ public class ReplexServer implements IServer {
                         m.getMetadataMap().get(IMetadata.LogUnitMetadataType.REPLEX_COMMIT));
                 for (UUID streamID : m.getStreamPairs().keySet()) {
                     Pair key = new Pair(streamID, m.getStreamPairs().get(streamID));
-                    LogUnitEntry e = dataCache.getIfPresent(key);
+                    LogUnitEntry e = dataCache.getIfPresent(key).getOriginalEntry();
                     if (e == null)
                         continue;
                     e.setReplexCommit(m.getReplexCommit());
                 }
                 r.sendResponse(ctx, m, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
-
             }
+            break;
+            case REPLEX_SEEK: {
+                ReplexLogUnitSeekRequestMsg m = (ReplexLogUnitSeekRequestMsg) msg;
+                seek(m, ctx, r);
+            }
+            break;
 //            case TRIM:
 //            {
 //                LogUnitTrimMsg m = (LogUnitTrimMsg) msg;
@@ -481,11 +488,12 @@ public class ReplexServer implements IServer {
         {
             /** Free all references */
             dataCache.asMap().values().parallelStream()
-                    .map(m -> m.buffer.release());
+                    .map(m -> m.getOriginalEntry().buffer.release());
         }
 
         dataCache = Caffeine.newBuilder()
-                .<Pair<UUID, Long>, LogUnitEntry>weigher((k, v) -> v.buffer == null ? 1 : v.buffer.readableBytes())
+                .<Pair<UUID, Long>, ReplexLogUnitEntry>weigher(
+                        (k, v) -> v.getOriginalEntry().buffer == null ? 1 : v.getOriginalEntry().buffer.readableBytes())
                 .maximumWeight(maxCacheSize).build();
 //                .removalListener(this::handleEviction)
 //                .writer(new CacheWriter<Long, LogUnitEntry>() {
@@ -632,6 +640,44 @@ public class ReplexServer implements IServer {
         }
     }
 
+    private long binarySeek(long min, long max, long targetAddress, UUID streamID) {
+        log.trace("binarySeek with arguments: min: {}, max: {}, targetAddress: {}", min, max, targetAddress);
+        if (min == max) {
+            return min;
+        }
+        long cur = (min + max) / 2;
+
+        ReplexLogUnitEntry e = dataCache.getIfPresent(new Pair(streamID, cur));
+        if (e == null) {
+            // TODO: THEN WE GO TO THE NEXT DOWN?? Hole fill??
+            return -1L;
+        } else {
+            if (e.getGlobalAddress() < targetAddress) {
+                return binarySeek(cur + 1, max, targetAddress, streamID);
+            } else if (e.getGlobalAddress() > targetAddress) {
+                return binarySeek(min, cur - 1, targetAddress, streamID);
+            } else {
+                // Return this entry.
+                return cur;
+            }
+        }
+    }
+
+    public void seek(ReplexLogUnitSeekRequestMsg msg, ChannelHandlerContext ctx, IServerRouter r) {
+        log.trace("Seek in stream: {}, at [{}]", msg.getStreamID(), msg.getGlobalAddress());
+        // Do a binary search over the offsets [0, msg.getLocalAddress] until the global address is hit.
+        long loc = binarySeek(1L, msg.getMaxLocalOffset(), msg.getGlobalAddress(), msg.getStreamID());
+        ReplexLogUnitEntry e = dataCache.getIfPresent(new Pair(msg.getStreamID(), loc));
+        assert(e.getGlobalAddress() >= msg.getGlobalAddress());
+
+        log.trace("seek returning: {}", e);
+        //TODO: return a SeekResponsemsg.
+        if (e == null)
+            r.sendResponse(ctx, msg, new ReplexLogUnitSeekResponseMsg(ReadResultType.EMPTY, -1L, -1L));
+        else
+            r.sendResponse(ctx, msg, new ReplexLogUnitSeekResponseMsg(e.getOriginalEntry(), loc, e.getGlobalAddress()));
+    }
+
     /** Service an incoming read request. */
     public void read(ReplexLogUnitReadRequestMsg msg, ChannelHandlerContext ctx, IServerRouter r)
     {
@@ -642,16 +688,16 @@ public class ReplexServer implements IServer {
         }
         else
         {*/
-        LogUnitEntry e = dataCache.getIfPresent(new Pair<UUID, Long>(msg.getStreamID(), msg.getOffset()));
-        if (e == null)
+        ReplexLogUnitEntry e = dataCache.getIfPresent(new Pair<UUID, Long>(msg.getStreamID(), msg.getOffset()));
+        if (e.getOriginalEntry() == null)
         {
-            r.sendResponse(ctx, msg, new LogUnitReadResponseMsg(ReadResultType.EMPTY));
+            r.sendResponse(ctx, msg, new ReplexLogUnitReadResponseMsg(ReadResultType.EMPTY, e.getGlobalAddress()));
         }
-        else if (e.isHole)
+        else if (e.getOriginalEntry().isHole)
         {
-            r.sendResponse(ctx, msg, new LogUnitReadResponseMsg(ReadResultType.FILLED_HOLE));
+            r.sendResponse(ctx, msg, new ReplexLogUnitReadResponseMsg(ReadResultType.FILLED_HOLE, e.getGlobalAddress()));
         } else {
-            r.sendResponse(ctx, msg, new LogUnitReadResponseMsg(e));
+            r.sendResponse(ctx, msg, new ReplexLogUnitReadResponseMsg(e.getOriginalEntry(), e.getGlobalAddress()));
         }
         //}
     }
@@ -687,9 +733,10 @@ public class ReplexServer implements IServer {
         for (UUID streamID : msg.getStreamPairs().keySet()) {
             LogUnitEntry e = new LogUnitEntry(msg.getData(), msg.getMetadataMap(), false);
             e.getBuffer().retain();
-            try {
-                dataCache.put(new Pair(streamID, msg.getStreamPairs().get(streamID)), e);
-            } catch (Exception ex) {
+
+            ReplexLogUnitEntry re = dataCache.get(new Pair(streamID, msg.getStreamPairs().get(streamID)),
+                    (k) -> new ReplexLogUnitEntry(msg.getGlobalAddress(), e));
+            if (re == null) {
                 // If a single one of the stream writes is an overwrite, then the whole thing gets aborted.
                 // We don't have to worry about removing the writes from the cache, because the commit bit will never be
                 // true.

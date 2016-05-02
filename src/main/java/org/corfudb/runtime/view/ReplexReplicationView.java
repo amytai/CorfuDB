@@ -79,7 +79,7 @@ public class ReplexReplicationView extends AbstractReplicationView {
                     log.trace("Write, Replex[{}, {}]: chain {}/{}", address, j, numReplexUnits);
                     CFUtils.getUninterruptibly(
                             getLayout().getReplexLogUnitClientByIndex(i, j)
-                                    .write(streamPairs.get(i), 0L, data), OverwriteException.class);
+                                    .write(streamPairs.get(i), address, 0L, data), OverwriteException.class);
                 }
             }
             // Now we write the COMMIT bits.
@@ -192,5 +192,13 @@ public class ReplexReplicationView extends AbstractReplicationView {
         }
         // TODO: Write acks for holes?
         // TODO: HOW TO FILL HOLES IN REPLEX?
+    }
+
+    @Override
+    public ILogUnitEntry seek(long globalAddress, UUID streamID, long maxLocalOffset) {
+        // Find the correct stripe in the Replex stripelist by hashing the streamID.
+        log.trace("fetch at global address [{}], stream: {}", globalAddress, streamID);
+        return CFUtils.getUninterruptibly(getLayout()
+                .getReplexLogUnitClient(streamID, 0).seek(globalAddress, streamID, maxLocalOffset));
     }
 }

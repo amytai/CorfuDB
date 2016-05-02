@@ -52,7 +52,7 @@ public class SequencerServer implements IServer {
     ConcurrentHashMap<UUID, Long> lastIssuedMap;
 
     // A map from stream to most recently issued local offset.
-    ConcurrentHashMap<UUID, Long> lastOffsetMap;
+    ConcurrentHashMap<UUID, Long> lastLocalOffsetMap;
 
 
 
@@ -71,7 +71,7 @@ public class SequencerServer implements IServer {
     {
         this.opts = opts;
         lastIssuedMap = new ConcurrentHashMap<>();
-        lastOffsetMap = new ConcurrentHashMap<>();
+        lastLocalOffsetMap = new ConcurrentHashMap<>();
         globalIndex = new AtomicLong();
 
         try {
@@ -146,22 +146,34 @@ public class SequencerServer implements IServer {
                 TokenRequestMsg req = (TokenRequestMsg) msg;
                 if (req.getNumTokens() == 0)
                 {
-                    long max = 0L;
-                    boolean hit = false;
-                    for (UUID id : req.getStreamIDs()) {
-                        Long lastIssued = lastIssuedMap.get(id);
-                        if (lastIssued != null) {hit = true;}
-                        max = Math.max(max, lastIssued == null ? Long.MIN_VALUE : lastIssued);
+                    // If REPLEX_ADDRESSES is set, then return the most recent local offsets of the requested streams.
+                    ImmutableMap.Builder<UUID, Long> mb = ImmutableMap.builder();
+                    if (req.getTokenFlags() != null && req.getTokenFlags()
+                            .contains(TokenRequestMsg.TokenRequestFlags.REPLEX_ADDRESSES)) {
+                        for (UUID id : req.getStreamIDs()) {
+                            mb.put(id, lastLocalOffsetMap.get(id));
+                        }
+                        r.sendResponse(ctx, msg,
+                                new TokenResponseMsg(-1L, mb.build()));
+                    } else {
+                        long max = 0L;
+                        boolean hit = false;
+                        for (UUID id : req.getStreamIDs()) {
+                            Long lastIssued = lastIssuedMap.get(id);
+                            if (lastIssued != null) {
+                                hit = true;
+                            }
+                            max = Math.max(max, lastIssued == null ? Long.MIN_VALUE : lastIssued);
+                        }
+                        if (!hit) {
+                            max = -1L; //no token ever issued
+                        }
+                        if (req.getStreamIDs().size() == 0) {
+                            max = globalIndex.get() - 1;
+                        }
+                        r.sendResponse(ctx, msg,
+                                new TokenResponseMsg(max, Collections.emptyMap()));
                     }
-                    if (!hit) {
-                        max = -1L; //no token ever issued
-                    }
-                    if (req.getStreamIDs().size() == 0)
-                    {
-                        max = globalIndex.get() - 1;
-                    }
-                    r.sendResponse(ctx, msg,
-                            new TokenResponseMsg(max, Collections.emptyMap()));
                 }
                 else {
                     // The following is to make sure the global token handed out does not go backwards
@@ -193,7 +205,7 @@ public class SequencerServer implements IServer {
                                 }
                                 return Math.max(thisIssue + req.getNumTokens() - 1, v);
                             });
-                            lastOffsetMap.compute(id, (k, v) -> {
+                            lastLocalOffsetMap.compute(id, (k, v) -> {
                                 if (v == null) {
                                     mb.put(k, 0L);
                                     return 0L;
@@ -213,7 +225,7 @@ public class SequencerServer implements IServer {
                                 return Math.max(thisIssue + req.getNumTokens() - 1, v);
                             });
                             // Still keep offset map up-to-date
-                            lastOffsetMap.compute(id, (k, v) -> {
+                            lastLocalOffsetMap.compute(id, (k, v) -> {
                                 if (v == null) {
                                     return 0L;
                                 }

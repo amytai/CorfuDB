@@ -40,19 +40,21 @@ public class ReplexServerTest extends AbstractServerTest {
         this.router.setServerUnderTest(rs);
 //        // First write a message
         ReplexLogUnitWriteMsg m = new ReplexLogUnitWriteMsg(
-                Collections.singletonMap(CorfuRuntime.getStreamID("a"), 0L));
+                Collections.singletonMap(CorfuRuntime.getStreamID("a"), 0L), 0L);
         m.setRank(0L);
         m.setPayload("0".getBytes());
         sendMessage(m);
 
-        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L)).getMetadataMap())
+        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L))
+                .getOriginalEntry().getMetadataMap())
                 .doesNotContainKey(IMetadata.LogUnitMetadataType.REPLEX_COMMIT);
 
         ReplexCommitMsg cm = new ReplexCommitMsg(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 0L));
         cm.setReplexCommit(true);
         sendMessage(cm);
 
-        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L)).getMetadataMap())
+        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L))
+                .getOriginalEntry().getMetadataMap())
                 .containsEntry(IMetadata.LogUnitMetadataType.REPLEX_COMMIT, true);
 
         rs.shutdown();
@@ -67,23 +69,27 @@ public class ReplexServerTest extends AbstractServerTest {
         HashMap<UUID, Long> streams = new HashMap();
         streams.put(CorfuRuntime.getStreamID("a"), 0L);
         streams.put(CorfuRuntime.getStreamID("b"), 0L);
-        ReplexLogUnitWriteMsg m = new ReplexLogUnitWriteMsg(streams);
+        ReplexLogUnitWriteMsg m = new ReplexLogUnitWriteMsg(streams, 0L);
         m.setRank(0L);
         m.setPayload("0".getBytes());
         sendMessage(m);
 
-        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L)).getMetadataMap())
+        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L))
+                .getOriginalEntry().getMetadataMap())
                 .doesNotContainKey(IMetadata.LogUnitMetadataType.REPLEX_COMMIT);
-        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("b"), 0L)).getMetadataMap())
+        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("b"), 0L))
+                .getOriginalEntry().getMetadataMap())
                 .doesNotContainKey(IMetadata.LogUnitMetadataType.REPLEX_COMMIT);
 
         ReplexCommitMsg cm = new ReplexCommitMsg(streams);
         cm.setReplexCommit(true);
         sendMessage(cm);
 
-        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L)).getMetadataMap())
+        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("a"), 0L))
+                .getOriginalEntry().getMetadataMap())
                 .containsEntry(IMetadata.LogUnitMetadataType.REPLEX_COMMIT, true);
-        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("b"), 0L)).getMetadataMap())
+        assertThat(rs.dataCache.getIfPresent(new Pair(CorfuRuntime.getStreamID("b"), 0L))
+                .getOriginalEntry().getMetadataMap())
                 .containsEntry(IMetadata.LogUnitMetadataType.REPLEX_COMMIT, true);
 
         rs.shutdown();
