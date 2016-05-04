@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.RangeSet;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+import javafx.util.Pair;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -57,7 +58,7 @@ public class ReplexLogUnitClient implements IClient {
             case READ_RESPONSE:
                 router.completeRequest(msg.getRequestID(), new ReadResult((LogUnitReadResponseMsg)msg));
                 break;
-            case READ_RANGE_RESPONSE: {
+            /*case READ_RANGE_RESPONSE: {
                 LogUnitReadRangeResponseMsg rmsg = (LogUnitReadRangeResponseMsg) msg;
                 Map<Long, ReadResult> lr = new ConcurrentHashMap<>();
                 rmsg.getResponseMap().entrySet().parallelStream()
@@ -65,7 +66,7 @@ public class ReplexLogUnitClient implements IClient {
                 router.completeRequest(msg.getRequestID(), lr);
             }
             break;
-            /*case CONTIGUOUS_TAIL: {
+            case CONTIGUOUS_TAIL: {
                 LogUnitTailMsg m = (LogUnitTailMsg) msg;
                 router.completeRequest(msg.getRequestID(), new ContiguousTailData(m.getContiguousTail(),
                         m.getStreamAddresses()));
@@ -83,6 +84,18 @@ public class ReplexLogUnitClient implements IClient {
                 ReplexSeekResult sr = new ReplexSeekResult(m);
                 sr.setAddress(m.getGlobalAddress());
                 router.completeRequest(msg.getRequestID(), sr);
+            }
+            break;
+            case REPLEX_READ_RANGE_RESPONSE: {
+                ReplexLogUnitReadRangeResponseMsg m = (ReplexLogUnitReadRangeResponseMsg) msg;
+                Map<Pair<UUID, Long>, ReadResult> map = new ConcurrentHashMap<>();
+                m.getResponseMap().entrySet().parallelStream()
+                        .forEach(e -> {
+                            ReadResult rr = new ReadResult(e.getValue());
+                            rr.setAddress(e.getValue().getGlobalAddress());
+                            map.put(e.getKey(), rr);
+                        });
+                router.completeRequest(msg.getRequestID(), map);
             }
             break;
         }
@@ -107,6 +120,7 @@ public class ReplexLogUnitClient implements IClient {
                     .add(CorfuMsg.CorfuMsgType.STREAM_READ)
                     .add(CorfuMsg.CorfuMsgType.REPLEX_READ_RESPONSE)
                     .add(CorfuMsg.CorfuMsgType.REPLEX_SEEK_RESPONSE)
+                    .add(CorfuMsg.CorfuMsgType.REPLEX_READ_RANGE_RESPONSE)
 
                     .add(CorfuMsg.CorfuMsgType.ERROR_OK)
                     .add(CorfuMsg.CorfuMsgType.ERROR_TRIMMED)
@@ -227,8 +241,8 @@ public class ReplexLogUnitClient implements IClient {
      *
      * @param addresses The addresses to read.
      */
-    public CompletableFuture<Map<Long,ReadResult>> readRange(RangeSet<Long> addresses) {
-        return router.sendMessageAndGetCompletable(new CorfuRangeMsg(CorfuMsg.CorfuMsgType.READ_RANGE, addresses));
+    public CompletableFuture<Map<Pair<UUID, Long>,ReadResult>> readRange(Map<UUID, RangeSet<Long>> addresses) {
+        return router.sendMessageAndGetCompletable(new ReplexLogUnitReadRangeRequestMsg(addresses));
     }
 
     /**

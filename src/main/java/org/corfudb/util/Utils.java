@@ -2,6 +2,7 @@ package org.corfudb.util;
 
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
+import javafx.util.Pair;
 import jdk.internal.org.objectweb.asm.ClassReader;
 import jdk.internal.org.objectweb.asm.tree.AbstractInsnNode;
 import jdk.internal.org.objectweb.asm.tree.ClassNode;
@@ -164,6 +165,15 @@ public class Utils
         for (long l = range.lowerEndpoint(); l <= range.upperEndpoint(); l++)
         {
             if (range.contains(l)) {s.add(l);}
+        }
+        return s;
+    }
+
+    public static Set<Pair<UUID, Long>> discretizeRange(Range<Long> range, UUID streamID) {
+        Set<Pair<UUID, Long>> s = new HashSet<>();
+        for (long l = range.lowerEndpoint(); l <= range.upperEndpoint(); l++)
+        {
+            if (range.contains(l)) {s.add(new Pair(streamID, l));}
         }
         return s;
     }

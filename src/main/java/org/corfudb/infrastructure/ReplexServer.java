@@ -393,6 +393,12 @@ public class ReplexServer implements IServer {
                 log.trace("Handling read request for address ({}, {})", readMsg.getStreamID(), readMsg.getOffset());
                 read(readMsg, ctx, r);
                 break;
+            case REPLEX_READ_RANGE_REQUEST: {
+                ReplexLogUnitReadRangeRequestMsg rangeRequestMsg = (ReplexLogUnitReadRangeRequestMsg) msg;
+                log.trace("Handling range read request for address ranges {}", rangeRequestMsg.getRanges());
+                read(rangeRequestMsg, ctx, r);
+            }
+                break;
 //            case READ_RANGE:
 //                CorfuRangeMsg rangeReadMsg = (CorfuRangeMsg) msg;
 //                log.trace("Handling read request for address ranges {}", rangeReadMsg.getRanges());
@@ -703,21 +709,24 @@ public class ReplexServer implements IServer {
     }
 
     /** Service an incoming ranged read request. */
-    /*public void read(CorfuRangeMsg msg, ChannelHandlerContext ctx, IServerRouter r)
+    public void read(ReplexLogUnitReadRangeRequestMsg msg, ChannelHandlerContext ctx, IServerRouter r)
     {
         log.trace("ReadRange[{}]", msg.getRanges());
-        Set<Long> total = new HashSet<>();
-        for (Range<Long> range : msg.getRanges().asRanges())
-        {
-            total.addAll(Utils.discretizeRange(range));
+        Set<Pair<UUID, Long>> total = new HashSet<>();
+        for (UUID streamID : msg.getRanges().keySet()) {
+            for (Range<Long> range : msg.getRanges().get(streamID).asRanges()) {
+                total.addAll(Utils.discretizeRange(range, streamID));
+            }
         }
 
-        Map<Long, LogUnitEntry> e = dataCache.getAll(total);
-        Map<Long, LogUnitReadResponseMsg> o = new ConcurrentHashMap<>();
+        Map<Pair<UUID, Long>, ReplexLogUnitEntry> e = dataCache.getAllPresent(total);
+        Map<Pair<UUID, Long>, ReplexLogUnitReadResponseMsg> o = new ConcurrentHashMap<>();
         e.entrySet().parallelStream()
-                .forEach(rv -> o.put(rv.getKey(), new LogUnitReadResponseMsg(rv.getValue())));
-        r.sendResponse(ctx, msg, new LogUnitReadRangeResponseMsg(o));
-    }*/
+                .forEach(rv -> o.put(rv.getKey(),
+                        new ReplexLogUnitReadResponseMsg(
+                                rv.getValue().getOriginalEntry(), rv.getValue().getGlobalAddress())));
+        r.sendResponse(ctx, msg, new ReplexLogUnitReadRangeResponseMsg(o));
+    }
 
     /** Service an incoming write request. */
     public void write(ReplexLogUnitWriteMsg msg, ChannelHandlerContext ctx, IServerRouter r)

@@ -83,7 +83,9 @@ public class CorfuMsg {
         REPLEX_WRITE(47, ReplexLogUnitWriteMsg.class, ReplexServer.class),
         REPLEX_SEEK(48, ReplexLogUnitSeekRequestMsg.class, ReplexServer.class),
         REPLEX_SEEK_RESPONSE(49, ReplexLogUnitSeekResponseMsg.class, ReplexServer.class),
-        LOG_REPLEX_COMMIT(50, LogUnitCommitMsg.class, LogUnitServer.class),
+        REPLEX_READ_RANGE_REQUEST(50, ReplexLogUnitReadRangeRequestMsg.class, ReplexServer.class),
+        REPLEX_READ_RANGE_RESPONSE(51, ReplexLogUnitReadRangeResponseMsg.class, ReplexServer.class),
+        LOG_REPLEX_COMMIT(52, LogUnitCommitMsg.class, LogUnitServer.class),
 
         // Logging Unit Error Codes
         ERROR_OK(60, CorfuMsg.class, LogUnitServer.class),
@@ -153,7 +155,7 @@ public class CorfuMsg {
         int marker = buffer.readInt();
         if (marker != markerField) {
             throw new RuntimeException("Attempt to deserialize a message which is not a CorfuMsg, "
-            + "Marker = " + marker + " but expected 0xC0FC0FC0");
+            + "Marker = " + Integer.toHexString(marker) + " but expected 0xC0FC0FC0");
         }
         UUID clientID = new UUID(buffer.readLong(), buffer.readLong());
         long requestID = buffer.readLong();

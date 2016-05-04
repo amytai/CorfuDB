@@ -1,6 +1,7 @@
 package org.corfudb.runtime.clients;
 
 import com.google.common.collect.*;
+import javafx.util.Pair;
 import org.corfudb.infrastructure.IServer;
 import org.corfudb.infrastructure.LogUnitServer;
 import org.corfudb.infrastructure.ReplexServer;
@@ -124,7 +125,50 @@ public class ReplexLogUnitClientTest extends AbstractClientTest {
                 .isEqualTo(testString2);
         assertThat(r.getLocalOffset()).isEqualTo(1L);
         assertThat(r.getAddress()).isEqualTo(2L);
+    }
 
+    @Test
+    public void CanReadRanges() throws Exception {
+        byte[] testString0 = "hello world0".getBytes();
+        byte[] testString1 = "hello world1".getBytes();
+        byte[] testString2 = "hello world2".getBytes();
+        byte[] testString3 = "hello world3".getBytes();
+        HashMap<UUID, Long> streams = new HashMap();
+        streams.put(CorfuRuntime.getStreamID("a"), 0L);
+        streams.put(CorfuRuntime.getStreamID("b"), 0L);
+
+        client.write(streams, 0L, 0, testString0).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 1L), 1L, 0, testString1).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("b"), 1L), 2L, 0, testString2).get();
+        client.write(Collections.singletonMap(CorfuRuntime.getStreamID("a"), 2L), 3L, 0, testString3).get();
+
+        Map<UUID, RangeSet<Long>> rangeMap = new HashMap<>();
+        RangeSet<Long> aSet = TreeRangeSet.create();
+        aSet.add(Range.closed(0L, 2L));
+        RangeSet<Long> bSet = TreeRangeSet.create();
+        bSet.add(Range.closed(0L, 2L));
+
+        rangeMap.put(CorfuRuntime.getStreamID("a"), aSet);
+        rangeMap.put(CorfuRuntime.getStreamID("b"), bSet);
+
+        Map<Pair<UUID, Long>, LogUnitReadResponseMsg.ReadResult> resultMap = client.readRange(rangeMap).get();
+
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("a"), 0L)).getAddress()).isEqualTo(0L);
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("a"), 0L)).getPayload()).isEqualTo(testString0);
+
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("a"), 1L)).getAddress()).isEqualTo(1L);
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("a"), 1L)).getPayload()).isEqualTo(testString1);
+
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("a"), 2L)).getAddress()).isEqualTo(3L);
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("a"), 2L)).getPayload()).isEqualTo(testString3);
+
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("b"), 0L)).getAddress()).isEqualTo(0L);
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("b"), 0L)).getPayload()).isEqualTo(testString0);
+
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("b"), 1L)).getAddress()).isEqualTo(2L);
+        assertThat(resultMap.get(new Pair(CorfuRuntime.getStreamID("b"), 1L)).getPayload()).isEqualTo(testString2);
+
+        assertThat(resultMap).doesNotContainKey(new Pair(CorfuRuntime.getStreamID("b"), 2L));
     }
 
 }
