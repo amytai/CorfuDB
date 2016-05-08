@@ -35,20 +35,21 @@ public class AppendBenchmark {
             "AppendBenchmark, append to streams based on backpointer or Replex.\n"
                     + "\n"
                     + "Usage:\n"
-                    + "\tAppendBenchmark  -c <config> [-nl <numLay>] [-ns <numSeq>] [-s <numStreams>] [-n <numAppends>] [-r] [-d <level>]\n"
+                    + "\tAppendBenchmark  -c <config> [-l <numLay>] [-q <numSeq>] [-s <numStreams>] [-a <numAppends>] [-r] [-d <level>] [-m <numClients>]\n"
                     + "\n"
                     + "Options:\n"
                     + " -c <config>, --config=<config>                 The config string to pass to the org.corfudb.runtime. \n"
                     + "                                                A comma-delimited list of Corfu servers. These will be read\n"
                     + "                                                in the order [-nl], [-ns], [...]. [...] denotes the leftover\n"
                     + "                                                Corfu servers, which are considered LUs.\n"
-                    + " -nl <numLay>, --numLay=<numLay>                Number of layout servers to use in the benchmark. [default: 1] \n"
-                    + " -ns <numSeq>, --numSeq=<numSeq>                Number of sequencers to use in the benchmark. [default: 1] \n"
+                    + " -l <numLay>, --numLay=<numLay>                Number of layout servers to use in the benchmark. [default: 1] \n"
+                    + " -q <numSeq>, --numSeq=<numSeq>                Number of sequencers to use in the benchmark. [default: 1] \n"
                     + " -s <numStreams>, --numStreams=<numStreams>     Number of streams to use in the benchmark. [default: 10] \n"
-                    + " -n <numAppends>, --numAppends=<numAppends>     Number of appends to use in the benchmark. [default: 10K] \n"
+                    + " -a <numAppends>, --numAppends=<numAppends>     Number of appends to use in the benchmark. [default: 10K] \n"
                     + " -r                                             If used, flag denotes use Replex instead of backpointers. \n"
                     + " -d <level>, --log-level=<level>                Set the logging level, valid levels are: \n"
                     + "                                                ERROR,WARN,INFO,DEBUG,TRACE [default: INFO].\n"
+                    + " -m <numClients>, --numClients=<numClients>    Number of clients to wait for before starting benchmark. [default: 1] \n"
                     + " -h, --help                                     Show this screen\n"
                     + " --version                                      Show version\n";
 
@@ -101,16 +102,16 @@ public class AppendBenchmark {
         );
         layoutRouter.getClient(LayoutClient.class).bootstrapLayout(testLayout).get();
 
-       /* log.trace("Creating seqRouter for {}:{}", layoutH, layoutP);
-        NettyClientRouter seqRouter = new NettyClientRouter(sequencerH, sequencerP);
-        seqRouter.addClient(new BaseClient())
-                .addClient(new SequencerClient())
-                .start();*/
-
-        // Get a org.corfudb.runtime instance from the options.
         CorfuRuntime rt = new CorfuRuntime(addressPortServers.get(0)).connect();
 
+        // Coordinate with other clients through the sequencer
+        int numClients = Integer.parseInt((String) opts.get("--numClients")) - 1;
+        rt.getSequencerView().nextToken(Collections.singleton(new UUID(0,0)), 1);
+        while (rt.getSequencerView().nextToken(Collections.singleton(new UUID(0,0)), 0).getToken() != numClients) ;
+
+
         // Now we start the test.
+        // TODO: FILL IN TEST BODY HERE.
         Set<UUID> streams = createStreams(Integer.parseInt((String) opts.get("--numStreams")));
 
         rt.getStreamsView().write(streams, randomData(512));
