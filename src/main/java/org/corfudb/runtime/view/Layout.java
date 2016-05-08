@@ -174,12 +174,15 @@ public class Layout implements Cloneable {
     public LayoutStripe getStripe(UUID streamID)
     {
         LayoutSegment ls = segments.get(segments.size()-1);
-        return ls.getReplexStripes().get(streamID.hashCode() % ls.getNumberOfReplexStripes());
+        return ls.getReplexStripes().get(
+                ((streamID.hashCode() % ls.getNumberOfReplexStripes()) + ls.getNumberOfReplexStripes())
+                % ls.getNumberOfReplexStripes());
     }
 
     public int getStripeIndex(UUID streamID) {
         LayoutSegment ls = segments.get(segments.size()-1);
-        return streamID.hashCode() % ls.getNumberOfReplexStripes();
+        return ((streamID.hashCode() % ls.getNumberOfReplexStripes()) + ls.getNumberOfReplexStripes())
+                % ls.getNumberOfReplexStripes();
     }
 
     public int getNumberOfReplexStripes() {
