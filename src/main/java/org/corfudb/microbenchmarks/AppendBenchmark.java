@@ -74,15 +74,7 @@ public class AppendBenchmark {
         String layoutH = addressPortServers.get(0).split(":")[0];
         Integer layoutP = Integer.parseInt(addressPortServers.get(0).split(":")[1]);
 
-        int LUstripes = (addressPortServers.size() - 2) / 2;
-        //List<String> LUServers1 = addressPortServers.subList(2, 2 + LUServersPerReplica);
-        //List<String> LUServers2 = addressPortServers.subList(2+LUServersPerReplica, addressPortServers.size());
-        List<Layout.LayoutStripe> stripes = new ArrayList<>(LUstripes);
-        int startIndex = 2;
-        for (int i = 0; i < LUstripes; i++) {
-            stripes.add(new Layout.LayoutStripe(addressPortServers.subList(startIndex, startIndex + 2)));
-            startIndex+=2;
-        }
+
 
         // Create a client routers and set layout.
         log.trace("Creating layoutRouter for {}:{}", layoutH, layoutP);
@@ -93,20 +85,30 @@ public class AppendBenchmark {
 
         Layout testLayout;
         if ((boolean) opts.get("-r")) {
+            // In a replex, each log unit is its own stripe.
             String replexServers = (String) opts.get("--replexes");
 
             List<String> addressPortReplexServers = Pattern.compile(",")
                     .splitAsStream(replexServers)
                     .map(String::trim)
                     .collect(Collectors.toList());
+
+            List<Layout.LayoutStripe> stripes = new ArrayList<>(addressPortServers.size() - 2);
+            for (int i = 0; i < addressPortServers.size() - 2; i++) {
+                stripes.add(new Layout.LayoutStripe(addressPortServers.subList(2+i, 3+i)));
+            }
+
             Layout.LayoutSegment ls = new Layout.LayoutSegment(
                     Layout.ReplicationMode.REPLEX_REPLICATION,
                     0L,
                     -1L,
-                    Collections.singletonList(
-                            new Layout.LayoutStripe(addressPortServers.subList(2, addressPortServers.size()))));
+                    stripes);
 
-            ls.setReplexStripes(Collections.singletonList(new Layout.LayoutStripe(addressPortReplexServers)));
+            List<Layout.LayoutStripe> replexStripes = new ArrayList<>(addressPortReplexServers.size());
+            for (int i = 0; i < addressPortReplexServers.size(); i++) {
+                replexStripes.add(new Layout.LayoutStripe(addressPortReplexServers.subList(i,i+1)));
+            }
+            ls.setReplexStripes(replexStripes);
 
             testLayout = new Layout(
                     Collections.singletonList(addressPortServers.get(0)),
@@ -115,6 +117,16 @@ public class AppendBenchmark {
                     0L
             );
         } else {
+            int LUstripes = (addressPortServers.size() - 2) / 2;
+            //List<String> LUServers1 = addressPortServers.subList(2, 2 + LUServersPerReplica);
+            //List<String> LUServers2 = addressPortServers.subList(2+LUServersPerReplica, addressPortServers.size());
+            List<Layout.LayoutStripe> stripes = new ArrayList<>(LUstripes);
+            int startIndex = 2;
+            for (int i = 0; i < LUstripes; i++) {
+                stripes.add(new Layout.LayoutStripe(addressPortServers.subList(startIndex, startIndex + 2)));
+                startIndex+=2;
+            }
+
             testLayout = new Layout(
                     Collections.singletonList(addressPortServers.get(0)),
                     Collections.singletonList(addressPortServers.get(1)),
