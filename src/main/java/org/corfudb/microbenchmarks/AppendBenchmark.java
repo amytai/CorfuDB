@@ -35,21 +35,23 @@ public class AppendBenchmark {
             "AppendBenchmark, append to streams based on backpointer or Replex.\n"
                     + "\n"
                     + "Usage:\n"
-                    + "\tAppendBenchmark  -c <config> [-l <numLay>] [-q <numSeq>] [-s <numStreams>] [-a <numAppends>] [-r] [-d <level>] [-m <numClients>]\n"
+                    + "\tAppendBenchmark  -c <config> [-x <replexes>] [-l <numLay>] [-q <numSeq>] [-s <numStreams>] [-a <numAppends>] [-r] [-d <level>] [-m <numClients>]\n"
                     + "\n"
                     + "Options:\n"
                     + " -c <config>, --config=<config>                 The config string to pass to the org.corfudb.runtime. \n"
                     + "                                                A comma-delimited list of Corfu servers. These will be read\n"
                     + "                                                in the order [-nl], [-ns], [...]. [...] denotes the leftover\n"
                     + "                                                Corfu servers, which are considered LUs.\n"
-                    + " -l <numLay>, --numLay=<numLay>                Number of layout servers to use in the benchmark. [default: 1] \n"
-                    + " -q <numSeq>, --numSeq=<numSeq>                Number of sequencers to use in the benchmark. [default: 1] \n"
+                    + " -x <replexes>, --replexes=<replexes>           A config string to pass to the org.corfudb.runtime, \n"
+                    + "                                                denoting the locations of the Replex LU servers. \n"
+                    + " -l <numLay>, --numLay=<numLay>                 Number of layout servers to use in the benchmark. [default: 1] \n"
+                    + " -q <numSeq>, --numSeq=<numSeq>                 Number of sequencers to use in the benchmark. [default: 1] \n"
                     + " -s <numStreams>, --numStreams=<numStreams>     Number of streams to use in the benchmark. [default: 10] \n"
-                    + " -a <numAppends>, --numAppends=<numAppends>     Number of appends to use in the benchmark. [default: 10K] \n"
+                    + " -a <numAppends>, --numAppends=<numAppends>     Number of appends to use in the benchmark. [default: 10000] \n"
                     + " -r                                             If used, flag denotes use Replex instead of backpointers. \n"
                     + " -d <level>, --log-level=<level>                Set the logging level, valid levels are: \n"
                     + "                                                ERROR,WARN,INFO,DEBUG,TRACE [default: INFO].\n"
-                    + " -m <numClients>, --numClients=<numClients>    Number of clients to wait for before starting benchmark. [default: 1] \n"
+                    + " -m <numClients>, --numClients=<numClients>     Number of clients to wait for before starting benchmark. [default: 1] \n"
                     + " -h, --help                                     Show this screen\n"
                     + " --version                                      Show version\n";
 
@@ -72,11 +74,7 @@ public class AppendBenchmark {
         String layoutH = addressPortServers.get(0).split(":")[0];
         Integer layoutP = Integer.parseInt(addressPortServers.get(0).split(":")[1]);
 
-        String sequencerH = addressPortServers.get(1).split(":")[0];
-        Integer sequencerP = Integer.parseInt(addressPortServers.get(1).split(":")[1]);
-
         List<String> LUServers = addressPortServers.subList(2, addressPortServers.size());
-
 
         // Create a client routers and set layout.
         log.trace("Creating layoutRouter for {}:{}", layoutH, layoutP);
@@ -85,21 +83,44 @@ public class AppendBenchmark {
                 .addClient(new LayoutClient())
                 .start();
 
-        Layout testLayout = new Layout(
-                Collections.singletonList(addressPortServers.get(0)),
-                Collections.singletonList(addressPortServers.get(1)),
-                Collections.singletonList(new Layout.LayoutSegment(
-                        Layout.ReplicationMode.CHAIN_REPLICATION,
-                        0L,
-                        -1L,
-                        Collections.singletonList(
-                                new Layout.LayoutStripe(
-                                        LUServers
-                                )
-                        )
-                )),
-                0L
-        );
+        Layout testLayout;
+        if ((boolean) opts.get("-r")) {
+            String replexServers = (String) opts.get("--replexes");
+
+            List<String> addressPortReplexServers = Pattern.compile(",")
+                    .splitAsStream(replexServers)
+                    .map(String::trim)
+                    .collect(Collectors.toList());
+            Layout.LayoutSegment ls = new Layout.LayoutSegment(
+                    Layout.ReplicationMode.REPLEX_REPLICATION,
+                    0L,
+                    -1L,
+                    Collections.singletonList(new Layout.LayoutStripe(LUServers)));
+            ls.setReplexStripes(Collections.singletonList(new Layout.LayoutStripe(addressPortReplexServers)));
+
+            testLayout = new Layout(
+                    Collections.singletonList(addressPortServers.get(0)),
+                    Collections.singletonList(addressPortServers.get(1)),
+                    Collections.singletonList(ls),
+                    0L
+            );
+        } else {
+            testLayout = new Layout(
+                    Collections.singletonList(addressPortServers.get(0)),
+                    Collections.singletonList(addressPortServers.get(1)),
+                    Collections.singletonList(new Layout.LayoutSegment(
+                            Layout.ReplicationMode.CHAIN_REPLICATION,
+                            0L,
+                            -1L,
+                            Collections.singletonList(
+                                    new Layout.LayoutStripe(
+                                            LUServers
+                                    )
+                            )
+                    )),
+                    0L
+            );
+        }
         layoutRouter.getClient(LayoutClient.class).bootstrapLayout(testLayout).get();
 
         CorfuRuntime rt = new CorfuRuntime(addressPortServers.get(0)).connect();
@@ -112,16 +133,36 @@ public class AppendBenchmark {
 
         // Now we start the test.
         // TODO: FILL IN TEST BODY HERE.
-        Set<UUID> streams = createStreams(Integer.parseInt((String) opts.get("--numStreams")));
+        int numStreams = Integer.parseInt((String) opts.get("--numStreams"));
+        List<UUID> streams = createStreams(numStreams);
+        Random r = new Random(System.currentTimeMillis());
 
-        rt.getStreamsView().write(streams, randomData(512));
-
+        int numAppends = Integer.parseInt((String) opts.get("--numAppends"));
+        Object data = randomData(512);
+        long start;
+        long end;
+        if ((boolean) opts.get("-r")) {
+            start = System.currentTimeMillis();
+            for (int i = 0; i < numAppends; i++) {
+                rt.getReplexStreamsView().write(Collections.singleton(streams.get(r.nextInt(numStreams))), randomData(512));
+            }
+            end = System.currentTimeMillis();
+        } else {
+            start = System.currentTimeMillis();
+            for (int i = 0; i < numAppends; i++) {
+                rt.getStreamsView().write(Collections.singleton(streams.get(r.nextInt(numStreams))), randomData(512));
+            }
+            end = System.currentTimeMillis();
+        }
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
+        System.out.printf("Time to completion: %d ms\n", end - start);
+        double throughput = ((long) numAppends* 1000) / (end-start);
+        System.out.printf("Throughput: %f ops / sec\n", throughput);
     }
 
-    private static Set<UUID> createStreams(int numStreams) {
-        Set<UUID> streams = new HashSet<>();
+    private static List<UUID> createStreams(int numStreams) {
+        List<UUID> streams = new ArrayList<>();
         for (int i = 0; i < numStreams; i++) {
             streams.add(UUID.randomUUID());
         }

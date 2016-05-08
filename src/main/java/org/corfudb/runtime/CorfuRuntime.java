@@ -114,6 +114,7 @@ public class CorfuRuntime {
         router.addClient(new LayoutClient())
                 .addClient(new SequencerClient())
                 .addClient(new LogUnitClient())
+                .addClient(new ReplexLogUnitClient())
                 .start();
         nodeRouters.put(address, router);
         return router;
@@ -138,6 +139,10 @@ public class CorfuRuntime {
     /** Views of objects in the Corfu server instance. */
     @Getter(lazy=true)
     private final ObjectsView objectsView = new ObjectsView(this);
+
+    /** A view of streams based on replex in the Corfu server instance. */
+    @Getter(lazy=true)
+    private final ReplexStreamsView replexStreamsView = new ReplexStreamsView(this);
 
     public CorfuRuntime() {
         layoutServers = new ArrayList<>();
