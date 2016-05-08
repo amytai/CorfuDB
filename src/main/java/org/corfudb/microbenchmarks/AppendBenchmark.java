@@ -74,7 +74,15 @@ public class AppendBenchmark {
         String layoutH = addressPortServers.get(0).split(":")[0];
         Integer layoutP = Integer.parseInt(addressPortServers.get(0).split(":")[1]);
 
-        List<String> LUServers = addressPortServers.subList(2, addressPortServers.size());
+        int LUstripes = (addressPortServers.size() - 2) / 2;
+        //List<String> LUServers1 = addressPortServers.subList(2, 2 + LUServersPerReplica);
+        //List<String> LUServers2 = addressPortServers.subList(2+LUServersPerReplica, addressPortServers.size());
+        List<Layout.LayoutStripe> stripes = new ArrayList<>(LUstripes);
+        int startIndex = 2;
+        for (int i = 0; i < stripes.size(); i++) {
+            stripes.add(new Layout.LayoutStripe(addressPortServers.subList(startIndex, startIndex + 2)));
+            startIndex+=2;
+        }
 
         // Create a client routers and set layout.
         log.trace("Creating layoutRouter for {}:{}", layoutH, layoutP);
@@ -95,7 +103,9 @@ public class AppendBenchmark {
                     Layout.ReplicationMode.REPLEX_REPLICATION,
                     0L,
                     -1L,
-                    Collections.singletonList(new Layout.LayoutStripe(LUServers)));
+                    Collections.singletonList(
+                            new Layout.LayoutStripe(addressPortServers.subList(2, addressPortServers.size()))));
+
             ls.setReplexStripes(Collections.singletonList(new Layout.LayoutStripe(addressPortReplexServers)));
 
             testLayout = new Layout(
@@ -112,11 +122,7 @@ public class AppendBenchmark {
                             Layout.ReplicationMode.CHAIN_REPLICATION,
                             0L,
                             -1L,
-                            Collections.singletonList(
-                                    new Layout.LayoutStripe(
-                                            LUServers
-                                    )
-                            )
+                            stripes
                     )),
                     0L
             );
@@ -203,7 +209,7 @@ class AppendBenchmarkThread implements Runnable {
     private boolean replex;
 
     private Random r = new Random(System.currentTimeMillis());
-    private Object data = randomData(512);
+    private Object data = randomData(128);
 
     public AppendBenchmarkThread(CorfuRuntime rt, int numAppends, List<UUID> streams, boolean replex) {
         this.rt = rt;
