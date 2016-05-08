@@ -79,7 +79,7 @@ public class AppendBenchmark {
         //List<String> LUServers2 = addressPortServers.subList(2+LUServersPerReplica, addressPortServers.size());
         List<Layout.LayoutStripe> stripes = new ArrayList<>(LUstripes);
         int startIndex = 2;
-        for (int i = 0; i < stripes.size(); i++) {
+        for (int i = 0; i < LUstripes; i++) {
             stripes.add(new Layout.LayoutStripe(addressPortServers.subList(startIndex, startIndex + 2)));
             startIndex+=2;
         }
