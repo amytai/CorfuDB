@@ -74,7 +74,7 @@ public class ReplexReplicationView extends AbstractReplicationView {
             }
 
             for (int i = 0; i < streamPairs.length; i++) {
-                if (streamPairs == null) continue;
+                if (streamPairs[i] == null) continue;
                 int numReplexUnits = getLayout().getSegments().get(getLayout().getSegments().size() - 1)
                         .getReplexStripes().get(i).getLogServers().size();
                 for (int j = 0; j < numReplexUnits; j++) {
@@ -94,7 +94,7 @@ public class ReplexReplicationView extends AbstractReplicationView {
             }
             // Write to the secondary / stream index units.
             for (int i = 0; i < streamPairs.length; i++) {
-                if (streamPairs == null) continue;
+                if (streamPairs[i] == null) continue;
                 int numReplexUnits = getLayout().getSegments().get(getLayout().getSegments().size() - 1)
                         .getReplexStripes().get(i).getLogServers().size();
                 for (int j = 0; j < numReplexUnits; j++) {
