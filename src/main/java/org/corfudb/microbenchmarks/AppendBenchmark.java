@@ -146,7 +146,9 @@ public class AppendBenchmark {
         // Coordinate with other clients through the sequencer
         int numClients = Integer.parseInt((String) opts.get("--numClients")) - 1;
         rt.getSequencerView().nextToken(Collections.singleton(new UUID(0,0)), 1);
-        while (rt.getSequencerView().nextToken(Collections.singleton(new UUID(0,0)), 0).getToken() != numClients) ;
+        while (rt.getSequencerView().nextToken(Collections.singleton(new UUID(0,0)), 0).getToken() < numClients) {
+            Thread.sleep(5);
+        }
 
 
         // Now we start the test.
