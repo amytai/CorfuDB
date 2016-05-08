@@ -40,7 +40,7 @@ public class AppendBenchmark {
                     + "Options:\n"
                     + " -c <config>, --config=<config>                 The config string to pass to the org.corfudb.runtime. \n"
                     + "                                                A comma-delimited list of Corfu servers. These will be read\n"
-                    + "                                                in the order [-nl], [-ns], [...]. [...] denotes the leftover\n"
+                    + "                                                in the order [-l], [-q], [...]. [...] denotes the leftover\n"
                     + "                                                Corfu servers, which are considered LUs.\n"
                     + " -x <replexes>, --replexes=<replexes>           A config string to pass to the org.corfudb.runtime, \n"
                     + "                                                denoting the locations of the Replex LU servers. \n"
@@ -135,29 +135,27 @@ public class AppendBenchmark {
         // TODO: FILL IN TEST BODY HERE.
         int numStreams = Integer.parseInt((String) opts.get("--numStreams"));
         List<UUID> streams = createStreams(numStreams);
-        Random r = new Random(System.currentTimeMillis());
 
         int numAppends = Integer.parseInt((String) opts.get("--numAppends"));
-        Object data = randomData(512);
         long start;
         long end;
-        if ((boolean) opts.get("-r")) {
-            start = System.currentTimeMillis();
-            for (int i = 0; i < numAppends; i++) {
-                rt.getReplexStreamsView().write(Collections.singleton(streams.get(r.nextInt(numStreams))), randomData(512));
-            }
-            end = System.currentTimeMillis();
-        } else {
-            start = System.currentTimeMillis();
-            for (int i = 0; i < numAppends; i++) {
-                rt.getStreamsView().write(Collections.singleton(streams.get(r.nextInt(numStreams))), randomData(512));
-            }
-            end = System.currentTimeMillis();
+
+        Thread[] threads = new Thread[32];
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(new AppendBenchmarkThread(rt, numAppends, streams, (boolean) opts.get("-r")), "thread-" + i);
         }
+        start = System.currentTimeMillis();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].start();
+        }
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].join();
+        }
+        end = System.currentTimeMillis();
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
         System.out.printf("Time to completion: %d ms\n", end - start);
-        double throughput = ((long) numAppends* 1000) / (end-start);
+        double throughput = ((long) numAppends * 32 * 1000) / (end-start);
         System.out.printf("Throughput: %f ops / sec\n", throughput);
     }
 
@@ -167,13 +165,6 @@ public class AppendBenchmark {
             streams.add(UUID.randomUUID());
         }
         return streams;
-    }
-
-    private static Object randomData(int length) {
-        SecureRandom r = new SecureRandom();
-        byte data[] = new byte[length];
-        r.nextBytes(data);
-        return data;
     }
 
     private static void configureBase(Map<String, Object> opts)
@@ -201,5 +192,43 @@ public class AppendBenchmark {
                 System.out.println("Level " + opts.get("--log-level") + " not recognized, defaulting to level INFO");
         }
         root.debug("Arguments are: {}", opts);
+    }
+}
+
+class AppendBenchmarkThread implements Runnable {
+    private CorfuRuntime rt;
+    private int numAppends;
+    private List<UUID> streams;
+    private int numStreams;
+    private boolean replex;
+
+    private Random r = new Random(System.currentTimeMillis());
+    private Object data = randomData(512);
+
+    public AppendBenchmarkThread(CorfuRuntime rt, int numAppends, List<UUID> streams, boolean replex) {
+        this.rt = rt;
+        this.numAppends = numAppends;
+        this.streams = streams;
+        this.numStreams = streams.size();
+        this.replex = replex;
+    }
+
+    public void run() {
+        if (replex) {
+            for (int i = 0; i < numAppends; i++) {
+                rt.getReplexStreamsView().write(Collections.singleton(streams.get(r.nextInt(numStreams))), data);
+            }
+        } else {
+            for (int i = 0; i < numAppends; i++) {
+                rt.getStreamsView().write(Collections.singleton(streams.get(r.nextInt(numStreams))), data);
+            }
+        }
+    }
+
+    private Object randomData(int length) {
+        SecureRandom r = new SecureRandom();
+        byte data[] = new byte[length];
+        r.nextBytes(data);
+        return data;
     }
 }
