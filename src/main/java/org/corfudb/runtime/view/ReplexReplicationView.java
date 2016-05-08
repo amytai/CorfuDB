@@ -74,6 +74,7 @@ public class ReplexReplicationView extends AbstractReplicationView {
             }
 
             for (int i = 0; i < streamPairs.length; i++) {
+                if (streamPairs == null) continue;
                 int numReplexUnits = getLayout().getSegments().get(getLayout().getSegments().size() - 1)
                         .getReplexStripes().get(i).getLogServers().size();
                 for (int j = 0; j < numReplexUnits; j++) {
