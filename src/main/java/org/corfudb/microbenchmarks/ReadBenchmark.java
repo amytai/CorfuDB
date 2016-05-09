@@ -155,7 +155,7 @@ public class ReadBenchmark {
 
 
         // Now we start the test.
-        int numStreams = Integer.parseInt((String) opts.get("--numStreams"));
+        int numStreams = Integer.parseInt((String) opts.get("--numStreams")) / numClients;
         List<UUID> streams = createStreams(numStreams);
 
         int numAppends = Integer.parseInt((String) opts.get("--numAppends"));
@@ -175,7 +175,7 @@ public class ReadBenchmark {
         long end;
         // Appends are done, now we sync.
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams/32 * i, numStreams/32 * i + 32), (boolean) opts.get("-r")), "thread-" + i);
+            threads[i] = new Thread(new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams/32 * i, numStreams/32 * (i+1)), (boolean) opts.get("-r")), "thread-" + i);
         }
         start = System.currentTimeMillis();
         for (int i = 0; i < threads.length; i++) {
