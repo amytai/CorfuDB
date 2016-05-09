@@ -2,6 +2,9 @@ package org.corfudb.microbenchmarks;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import com.google.common.collect.Range;
+import com.google.common.collect.RangeSet;
+import com.google.common.collect.TreeRangeSet;
 import com.sun.javafx.fxml.expression.Expression;
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.cmdlets.ICmdlet;
@@ -13,6 +16,7 @@ import org.corfudb.runtime.clients.SequencerClient;
 import org.corfudb.runtime.view.Layout;
 import org.corfudb.runtime.view.ReplexStreamView;
 import org.corfudb.runtime.view.StreamView;
+import org.corfudb.util.CFUtils;
 import org.corfudb.util.GitRepositoryState;
 import org.docopt.Docopt;
 import org.slf4j.LoggerFactory;
@@ -175,7 +179,8 @@ public class ReadBenchmark {
         long end;
         // Appends are done, now we sync.
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams/32 * i, numStreams/32 * (i+1)), (boolean) opts.get("-r")), "thread-" + i);
+            threads[i] = new Thread(
+                    new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams/32 * i, numStreams/32 * (i+1)), (boolean) opts.get("-r"), testLayout), "thread-" + i);
         }
         start = System.currentTimeMillis();
         for (int i = 0; i < threads.length; i++) {
@@ -235,23 +240,32 @@ class ReadBenchmarkThread implements Runnable {
     private List<UUID> streams;
     private int numStreams;
     private boolean replex;
+    private Layout testLayout;
 
     private Random r = new Random(System.currentTimeMillis());
     private Object data = randomData(128);
 
-    public ReadBenchmarkThread(CorfuRuntime rt, int numAppends, List<UUID> streams, boolean replex) {
+    public ReadBenchmarkThread(CorfuRuntime rt, int numAppends, List<UUID> streams, boolean replex, Layout testLayout) {
         this.rt = rt;
         this.numAppends = numAppends;
         this.streams = streams;
         this.numStreams = streams.size();
         this.replex = replex;
+        this.testLayout = testLayout;
     }
 
     public void run() {
         if (replex) {
             for (int i = 0; i < streams.size(); i++) {
-                ReplexStreamView rsv = new ReplexStreamView(rt, streams.get(i));
-                rsv.readTo(Long.MAX_VALUE);
+                long limit =
+                        rt.getSequencerView().nextTokenWrapper(Collections.singleton(streams.get(i)), 0, true).getBackpointerMap().get(streams.get(i));
+                RangeSet rs = TreeRangeSet.create();
+                rs.add(Range.closed(0, limit));
+                CFUtils.getUninterruptibly(testLayout.getReplexLogUnitClient(streams.get(i), 0)
+                        .readRange(Collections.singletonMap(streams.get(i), rs)));
+
+                //ReplexStreamView rsv = new ReplexStreamView(rt, streams.get(i));
+                //rsv.readTo(Long.MAX_VALUE);
             }
         } else {
             for (int i = 0; i < streams.size(); i++) {
