@@ -40,4 +40,4 @@ fi
 CORFUDB_HEAP="${CORFUDB_HEAP:-4000}"
 export JVMFLAGS="-Xmx${CORFUDB_HEAP}m $SERVER_JVMFLAGS"
 
-nohup "$JAVA" -cp "$CLASSPATH" $JVMFLAGS org.corfudb.infrastructure.CorfuServer $* &
+nohup "$JAVA" -cp "$CLASSPATH" $JVMFLAGS org.corfudb.infrastructure.CorfuServer $* > log.txt &
