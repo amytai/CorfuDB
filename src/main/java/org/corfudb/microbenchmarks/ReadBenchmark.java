@@ -150,6 +150,9 @@ public class ReadBenchmark {
 
         CorfuRuntime rt = new CorfuRuntime(addressPortServers.get(0)).connect();
 
+        // Force the regular test to go to LUs.
+        rt.setCacheDisabled(true);
+
         // Coordinate with other clients through the sequencer
         int numClients = Integer.parseInt((String) opts.get("--numClients")) - 1;
         rt.getSequencerView().nextToken(Collections.singleton(new UUID(0,0)), 1);
