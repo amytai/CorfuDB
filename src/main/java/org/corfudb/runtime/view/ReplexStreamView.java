@@ -242,7 +242,7 @@ public class ReplexStreamView implements AutoCloseable {
             }
 
             UUID streamID = getCurrentContext().contextID;
-            Long thisRead = getCurrentContext().streamAddressToRead.get();
+            Long thisRead = getCurrentContext().logPointer.get();
 
             // we don't know what the global log address is until we have read the entry itself.
             //getCurrentContext().logPointer.set(thisRead+1);
@@ -281,7 +281,7 @@ public class ReplexStreamView implements AutoCloseable {
                 streamContexts.add(new StreamContext(ce.getOriginalStream(), ce.getFollowUntil()));
             }
             else {
-                getCurrentContext().streamAddressToRead.incrementAndGet();
+                getCurrentContext().logPointer.incrementAndGet();
                 return r;
             }
         }
@@ -292,7 +292,7 @@ public class ReplexStreamView implements AutoCloseable {
         boolean max = false;
         if (pos == Long.MAX_VALUE) {
             max = true;
-            latestToken = runtime.getSequencerView().nextToken(Collections.singleton(streamID), 0).getToken();
+            latestToken = runtime.getSequencerView().nextTokenWrapper(Collections.singleton(streamID), 0, true).getToken();
             log.trace("Linearization point set to {}", latestToken);
         }
         ArrayList<ILogUnitEntry> al = new ArrayList<>();

@@ -251,7 +251,7 @@ class ReadBenchmarkThread implements Runnable {
         if (replex) {
             for (int i = 0; i < streams.size(); i++) {
                 ReplexStreamView rsv = new ReplexStreamView(rt, streams.get(i));
-                while (rsv.read() != null) ;
+                rsv.readTo(Long.MAX_VALUE);
             }
         } else {
             for (int i = 0; i < streams.size(); i++) {
