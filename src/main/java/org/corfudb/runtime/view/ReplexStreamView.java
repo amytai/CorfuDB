@@ -292,7 +292,8 @@ public class ReplexStreamView implements AutoCloseable {
         boolean max = false;
         if (pos == Long.MAX_VALUE) {
             max = true;
-            latestToken = runtime.getSequencerView().nextTokenWrapper(Collections.singleton(streamID), 0, true).getToken();
+            latestToken = runtime.getSequencerView().nextTokenWrapper(Collections.singleton(streamID), 0, true)
+                    .getBackpointerMap().get(streamID);
             log.trace("Linearization point set to {}", latestToken);
         }
         ArrayList<ILogUnitEntry> al = new ArrayList<>();
