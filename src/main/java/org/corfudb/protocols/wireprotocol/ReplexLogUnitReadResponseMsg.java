@@ -47,7 +47,6 @@ public class ReplexLogUnitReadResponseMsg extends LogUnitReadResponseMsg {
     @Override
     public void serialize(ByteBuf buffer) {
         super.serialize(buffer);
-        buffer.writeByte(result.asByte());
         buffer.writeLong(globalAddress);
     }
 
@@ -60,7 +59,6 @@ public class ReplexLogUnitReadResponseMsg extends LogUnitReadResponseMsg {
     @Override
     public void fromBuffer(ByteBuf buffer) {
         super.fromBuffer(buffer);
-        result = readResultTypeMap.get(buffer.readByte());
         globalAddress = buffer.readLong();
     }
 }
