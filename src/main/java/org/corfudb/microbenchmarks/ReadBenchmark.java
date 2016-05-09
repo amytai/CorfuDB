@@ -184,7 +184,9 @@ public class ReadBenchmark {
         long end;
         // Appends are done, now we sync.
 
+        int numThreads = threads.length;
         if (numStreams < 32) {
+            numThreads = numStreams;
             Thread[] readThreads = new Thread[numStreams];
             for (int i = 0; i < readThreads.length; i++) {
                 readThreads[i] = new Thread(
@@ -213,7 +215,7 @@ public class ReadBenchmark {
             end = System.currentTimeMillis();
         }
 
-        double avg = (end-start) * 32;
+        double avg = (end-start) * numThreads;
         avg /= numStreams;
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
