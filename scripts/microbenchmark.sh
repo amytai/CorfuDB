@@ -40,4 +40,4 @@ CORFUDB_HEAP="${CORFUDB_HEAP:-1000}"
 export CORFUDB_JVMFLAGS="-Xmx${CORFUDB_HEAP}m $SERVER_JVMFLAGS"
 
 RUN_AS=`basename $0`
-nohup "$JAVA" -cp "$CLASSPATH" $JVMFLAGS org.corfudb.microbenchmarks.$1 ${*:2} &
+nohup "$JAVA" -cp "$CLASSPATH" $JVMFLAGS org.corfudb.microbenchmarks.$1 ${*:2} > log.txt &
