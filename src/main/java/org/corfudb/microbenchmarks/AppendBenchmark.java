@@ -153,7 +153,7 @@ public class AppendBenchmark {
 
         // Now we start the test.
         // TODO: FILL IN TEST BODY HERE.
-        int numStreams = Integer.parseInt((String) opts.get("--numStreams"));
+        int numStreams = Integer.parseInt((String) opts.get("--numStreams")) / numClients;
         List<UUID> streams = createStreams(numStreams);
 
         int numAppends = Integer.parseInt((String) opts.get("--numAppends"));
