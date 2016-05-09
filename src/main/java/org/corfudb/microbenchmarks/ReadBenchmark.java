@@ -185,17 +185,18 @@ public class ReadBenchmark {
         // Appends are done, now we sync.
         // We only select a fraction of the streams to sync.. no need to sync all of them
 
-        int numThreads = 32;
+        int numThreads = Math.min(32, numStreams);
+        Thread[] readThreads = new Thread[numThreads];
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(
-                    new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams / 32 * i, numStreams / 32 * (i + 1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
+            readThreads[i] = new Thread(
+                    new ReadBenchmarkThread(rt, numAppends, streams.subList(i, (i + 1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
         }
         start = System.currentTimeMillis();
-        for (int i = 0; i < threads.length; i++) {
-            threads[i].start();
+        for (int i = 0; i < readThreads.length; i++) {
+            readThreads[i].start();
         }
-        for (int i = 0; i < threads.length; i++) {
-            threads[i].join();
+        for (int i = 0; i < readThreads.length; i++) {
+            readThreads[i].join();
         }
         end = System.currentTimeMillis();
 
