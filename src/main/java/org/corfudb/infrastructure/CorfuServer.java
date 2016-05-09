@@ -72,7 +72,7 @@ public class CorfuServer {
             + "                                         Data will be lost when the server exits!\n"
             + " -c <size>, --max-cache=<size>           The size of the in-memory cache to serve requests from -\n"
             + "                                         If there is no log, then this is the max size of the log unit\n"
-            + "                                         evicted entries will be auto-trimmed. [default: 1000000000].\n"
+            + "                                         evicted entries will be auto-trimmed. [default: 4000000000].\n"
             + " -t <token>, --initial-token=<token>     The first token the sequencer will issue, or -1 to recover\n"
             + "                                         from the log. [default: -1].\n"
             + " -k <seconds>, --checkpoint=<seconds>    The rate the sequencer should checkpoint its state to disk,\n"
