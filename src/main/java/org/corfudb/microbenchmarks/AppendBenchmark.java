@@ -223,7 +223,7 @@ class AppendBenchmarkThread implements Runnable {
     private boolean replex;
 
     private Random r = new Random(System.currentTimeMillis());
-    private Object data = randomData(64);
+    private Object data = randomData(32);
 
     public AppendBenchmarkThread(CorfuRuntime rt, int numAppends, List<UUID> streams, boolean replex) {
         this.rt = rt;

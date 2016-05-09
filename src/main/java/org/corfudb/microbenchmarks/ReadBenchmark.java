@@ -248,7 +248,7 @@ class ReadBenchmarkThread implements Runnable {
     private Layout testLayout;
 
     private Random r = new Random(System.currentTimeMillis());
-    private Object data = randomData(128);
+    private Object data = randomData(32);
 
     public ReadBenchmarkThread(CorfuRuntime rt, int numAppends, List<UUID> streams, boolean replex, Layout testLayout) {
         this.rt = rt;
