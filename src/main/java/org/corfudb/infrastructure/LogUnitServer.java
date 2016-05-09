@@ -471,7 +471,7 @@ public class LogUnitServer implements IServer {
             break;
             case LOG_REPLEX_COMMIT: {
                 LogUnitCommitMsg m = (LogUnitCommitMsg) msg;
-                log.trace("Received commit bit of {} for address: {}", m.getReplexCommit(), m.getAddress());
+                log.info("Received commit bit of {} for address: {}", m.getReplexCommit(), m.getAddress());
                 LogUnitEntry e = dataCache.get(((LogUnitCommitMsg) msg).getAddress());
                 e.setReplexCommit(((LogUnitCommitMsg) msg).getReplexCommit());
                 e.setDirty(true);
