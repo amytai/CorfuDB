@@ -155,7 +155,7 @@ public class ReadBenchmark {
 
 
         // Now we start the test.
-        int numStreams = Integer.parseInt((String) opts.get("--numStreams")) / numClients;
+        int numStreams = Integer.parseInt((String) opts.get("--numStreams")) / (numClients + 1);
         List<UUID> streams = createStreams(numStreams);
 
         int numAppends = Integer.parseInt((String) opts.get("--numAppends"));
@@ -186,8 +186,11 @@ public class ReadBenchmark {
         }
         end = System.currentTimeMillis();
 
+        double avg = total * 32;
+        avg /= streams.size();
+
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
-        System.out.printf("Average latency of stream sync: %f ms\n", total * 32 / streams.size());
+        System.out.printf("Average latency of stream sync: %f ms\n", avg);
     }
 
     private static List<UUID> createStreams(int numStreams) {
