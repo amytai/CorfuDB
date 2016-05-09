@@ -183,37 +183,21 @@ public class ReadBenchmark {
         long start;
         long end;
         // Appends are done, now we sync.
+        // We only select a fraction of the streams to sync.. no need to sync all of them
 
-        int numThreads = threads.length;
-        if (numStreams < 32) {
-            numThreads = numStreams;
-            Thread[] readThreads = new Thread[numStreams];
-            for (int i = 0; i < readThreads.length; i++) {
-                readThreads[i] = new Thread(
-                        new ReadBenchmarkThread(rt, numAppends, streams.subList(i, i+1), (boolean) opts.get("-r"), theLayout), "thread-" + i);
-            }
-            start = System.currentTimeMillis();
-            for (int i = 0; i < readThreads.length; i++) {
-                readThreads[i].start();
-            }
-            for (int i = 0; i < readThreads.length; i++) {
-                readThreads[i].join();
-            }
-            end = System.currentTimeMillis();
-        } else {
-            for (int i = 0; i < threads.length; i++) {
-                threads[i] = new Thread(
-                        new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams / 32 * i, numStreams / 32 * (i + 1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
-            }
-            start = System.currentTimeMillis();
-            for (int i = 0; i < threads.length; i++) {
-                threads[i].start();
-            }
-            for (int i = 0; i < threads.length; i++) {
-                threads[i].join();
-            }
-            end = System.currentTimeMillis();
+        int numThreads = 32;
+        for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(
+                    new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams / 32 * i, numStreams / 32 * (i + 1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
         }
+        start = System.currentTimeMillis();
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].start();
+        }
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].join();
+        }
+        end = System.currentTimeMillis();
 
         double avg = (end-start) * numThreads;
         avg /= numStreams;
