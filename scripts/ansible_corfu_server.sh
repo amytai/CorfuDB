@@ -37,7 +37,7 @@ fi
 
 
 # default heap for corfudb
-CORFUDB_HEAP="${CORFUDB_HEAP:-8000}"
+CORFUDB_HEAP="${CORFUDB_HEAP:-16000}"
 export JVMFLAGS="-Xmx${CORFUDB_HEAP}m $SERVER_JVMFLAGS"
 
 nohup "$JAVA" -cp "$CLASSPATH" $JVMFLAGS org.corfudb.infrastructure.CorfuServer $* > log.txt &
