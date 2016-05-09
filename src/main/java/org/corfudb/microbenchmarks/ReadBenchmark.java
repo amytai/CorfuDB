@@ -200,8 +200,7 @@ public class ReadBenchmark {
         }
         end = System.currentTimeMillis();
 
-        double avg = (end-start) * numThreads;
-        avg /= numStreams;
+        double avg = (end-start) / numThreads;
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
         System.out.printf("Average latency of stream sync: %f ms\n", avg);
