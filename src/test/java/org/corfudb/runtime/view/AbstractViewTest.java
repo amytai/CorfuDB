@@ -55,6 +55,7 @@ public abstract class AbstractViewTest extends AbstractCorfuTest {
                     r.addClient(new LayoutClient())
                             .addClient(new SequencerClient())
                             .addClient(new LogUnitClient())
+                            .addClient(new ReplexLogUnitClient())
                             .addClient(new BaseClient())
                             .start();
                     serverMap.get(address).stream()

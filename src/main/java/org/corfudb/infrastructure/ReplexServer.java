@@ -695,9 +695,9 @@ public class ReplexServer implements IServer {
         else
         {*/
         ReplexLogUnitEntry e = dataCache.getIfPresent(new Pair<UUID, Long>(msg.getStreamID(), msg.getOffset()));
-        if (e.getOriginalEntry() == null)
+        if (e == null || e.getOriginalEntry() == null)
         {
-            r.sendResponse(ctx, msg, new ReplexLogUnitReadResponseMsg(ReadResultType.EMPTY, e.getGlobalAddress()));
+            r.sendResponse(ctx, msg, new ReplexLogUnitReadResponseMsg(ReadResultType.EMPTY, -1));
         }
         else if (e.getOriginalEntry().isHole)
         {

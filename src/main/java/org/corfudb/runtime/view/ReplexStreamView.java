@@ -249,11 +249,13 @@ public class ReplexStreamView implements AutoCloseable {
 
             log.trace("Read[{}]: reading at {}", streamID, thisRead);
             ILogUnitEntry r = runtime.getAddressSpaceView().read(streamID, thisRead);
+            log.trace("results type: {}", r.getResultType());
             if (r.getResultType() == LogUnitReadResponseMsg.ReadResultType.EMPTY)
             {
+                return null;
                 //determine whether or not this is a hole
                 //TODO: REPLEX needs to figure out if is a hole.
-                long latestToken = runtime.getSequencerView().nextToken(Collections.singleton(streamID), 0).getToken();
+                /*long latestToken = runtime.getSequencerView().nextToken(Collections.singleton(streamID), 0).getToken();
                 log.trace("Read[{}]: latest token at {}", streamID, latestToken);
                 if (latestToken < thisRead)
                 {
@@ -267,22 +269,20 @@ public class ReplexStreamView implements AutoCloseable {
                     //ignore overwrite.
                 }
                 r = runtime.getAddressSpaceView().read(streamID, thisRead);
-                log.debug("Read[{}]: holeFill {} result: {}", streamID, thisRead, r.getResultType());
+                log.debug("Read[{}]: holeFill {} result: {}", streamID, thisRead, r.getResultType());*/
             }
-            Set<UUID> streams = (Set<UUID>) r.getMetadataMap().get(IMetadata.LogUnitMetadataType.STREAM);
-            if (streams != null && streams.contains(getCurrentContext().contextID))
-            {
-                log.trace("Read[{}]: valid entry at {}", streamID, thisRead);
-                Object res = r.getPayload();
-                if (res instanceof StreamCOWEntry) {
-                    StreamCOWEntry ce = (StreamCOWEntry) res;
-                    log.trace("Read[{}]: encountered COW entry for {}@{}", streamID, ce.getOriginalStream(),
-                            ce.getFollowUntil());
-                    streamContexts.add(new StreamContext(ce.getOriginalStream(), ce.getFollowUntil()));
-                }
-                else {
-                    return r;
-                }
+
+            log.trace("Read[{}]: valid entry at {}", streamID, thisRead);
+            Object res = r.getPayload();
+            if (res instanceof StreamCOWEntry) {
+                StreamCOWEntry ce = (StreamCOWEntry) res;
+                log.trace("Read[{}]: encountered COW entry for {}@{}", streamID, ce.getOriginalStream(),
+                        ce.getFollowUntil());
+                streamContexts.add(new StreamContext(ce.getOriginalStream(), ce.getFollowUntil()));
+            }
+            else {
+                getCurrentContext().streamAddressToRead.incrementAndGet();
+                return r;
             }
         }
     }
