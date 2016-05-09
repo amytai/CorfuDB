@@ -178,12 +178,14 @@ public class ReadBenchmark {
             threads[i].join();
         }
 
+
+        Layout theLayout = rt.fetchLayout().get();
         long start;
         long end;
         // Appends are done, now we sync.
         for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(
-                    new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams/32 * i, numStreams/32 * (i+1)), (boolean) opts.get("-r"), testLayout), "thread-" + i);
+                    new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams/32 * i, numStreams/32 * (i+1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
         }
         start = System.currentTimeMillis();
         for (int i = 0; i < threads.length; i++) {
@@ -262,8 +264,8 @@ class ReadBenchmarkThread implements Runnable {
             for (int i = 0; i < streams.size(); i++) {
                 long limit =
                         rt.getSequencerView().nextTokenWrapper(Collections.singleton(streams.get(i)), 0, true).getBackpointerMap().get(streams.get(i));
-                RangeSet rs = TreeRangeSet.create();
-                rs.add(Range.closed(0, limit));
+                RangeSet<Long> rs = TreeRangeSet.create();
+                rs.add(Range.closed(0L, limit));
                 CFUtils.getUninterruptibly(testLayout.getReplexLogUnitClient(streams.get(i), 0)
                         .readRange(Collections.singletonMap(streams.get(i), rs)));
 
