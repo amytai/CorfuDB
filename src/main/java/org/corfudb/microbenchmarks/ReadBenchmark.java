@@ -170,7 +170,7 @@ public class ReadBenchmark {
         for (int i = 0; i < threads.length; i++) {
             threads[i].join();
         }
-        long total = 0;
+
         long start;
         long end;
         // Appends are done, now we sync.
@@ -186,7 +186,7 @@ public class ReadBenchmark {
         }
         end = System.currentTimeMillis();
 
-        double avg = total * 32;
+        double avg = (end-start) * 32;
         avg /= streams.size();
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());

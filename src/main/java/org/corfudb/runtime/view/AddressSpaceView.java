@@ -302,7 +302,7 @@ public class AddressSpaceView extends AbstractView {
         //TODO: reconfigs that are correct for ReplexReplicationMode
         return layoutHelper(l -> AbstractReplicationView
                 .getReplicationView(l, Layout.ReplicationMode.REPLEX_REPLICATION,
-                        l.getSegments().get(l.getSegments().size()))
+                        l.getSegments().get(l.getSegments().size() - 1))
                 .streamRead(streamID, offset)
         ).setRuntime(runtime);
     }
@@ -321,7 +321,7 @@ public class AddressSpaceView extends AbstractView {
 
         return layoutHelper(l -> AbstractReplicationView
                         .getReplicationView(l, Layout.ReplicationMode.REPLEX_REPLICATION,
-                                l.getSegments().get(l.getSegments().size()))
+                                l.getSegments().get(l.getSegments().size() - 1))
                         .seek(globalOffset, streamID, maxLocalOffset)
         ).setRuntime(runtime);
     }
