@@ -183,21 +183,38 @@ public class ReadBenchmark {
         long start;
         long end;
         // Appends are done, now we sync.
-        for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(
-                    new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams/32 * i, numStreams/32 * (i+1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
+
+        if (numStreams < 32) {
+            Thread[] readThreads = new Thread[numStreams];
+            for (int i = 0; i < readThreads.length; i++) {
+                readThreads[i] = new Thread(
+                        new ReadBenchmarkThread(rt, numAppends, streams.subList(i, i+1), (boolean) opts.get("-r"), theLayout), "thread-" + i);
+            }
+            start = System.currentTimeMillis();
+            for (int i = 0; i < readThreads.length; i++) {
+                readThreads[i].start();
+            }
+            for (int i = 0; i < readThreads.length; i++) {
+                readThreads[i].join();
+            }
+            end = System.currentTimeMillis();
+        } else {
+            for (int i = 0; i < threads.length; i++) {
+                threads[i] = new Thread(
+                        new ReadBenchmarkThread(rt, numAppends, streams.subList(numStreams / 32 * i, numStreams / 32 * (i + 1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
+            }
+            start = System.currentTimeMillis();
+            for (int i = 0; i < threads.length; i++) {
+                threads[i].start();
+            }
+            for (int i = 0; i < threads.length; i++) {
+                threads[i].join();
+            }
+            end = System.currentTimeMillis();
         }
-        start = System.currentTimeMillis();
-        for (int i = 0; i < threads.length; i++) {
-            threads[i].start();
-        }
-        for (int i = 0; i < threads.length; i++) {
-            threads[i].join();
-        }
-        end = System.currentTimeMillis();
 
         double avg = (end-start) * 32;
-        avg /= streams.size();
+        avg /= numStreams;
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
         System.out.printf("Average latency of stream sync: %f ms\n", avg);
