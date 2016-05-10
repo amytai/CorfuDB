@@ -185,22 +185,45 @@ public class ReadBenchmark {
         // Appends are done, now we sync.
         // We only select a fraction of the streams to sync.. no need to sync all of them
 
-        int numThreads = Math.min(32, numStreams);
+        /*int numThreads = Math.min(32, numStreams);
         Thread[] readThreads = new Thread[numThreads];
         for (int i = 0; i < threads.length; i++) {
             readThreads[i] = new Thread(
                     new ReadBenchmarkThread(rt, numAppends, streams.subList(i, (i + 1)), (boolean) opts.get("-r"), theLayout), "thread-" + i);
-        }
-        start = System.currentTimeMillis();
+
+
         for (int i = 0; i < readThreads.length; i++) {
             readThreads[i].start();
         }
         for (int i = 0; i < readThreads.length; i++) {
             readThreads[i].join();
         }
+        }*/
+
+
+        start = System.currentTimeMillis();
+        if ((boolean) opts.get("-r")) {
+            for (int i = 0; i < 2; i++) {
+                long limit =
+                        rt.getSequencerView().nextTokenWrapper(Collections.singleton(streams.get(i)), 0, true).getBackpointerMap().get(streams.get(i));
+                RangeSet<Long> rs = TreeRangeSet.create();
+                rs.add(Range.closed(0L, limit));
+                CFUtils.getUninterruptibly(theLayout.getReplexLogUnitClient(streams.get(i), 0)
+                        .readRange(Collections.singletonMap(streams.get(i), rs)));
+
+                //ReplexStreamView rsv = new ReplexStreamView(rt, streams.get(i));
+                //rsv.readTo(Long.MAX_VALUE);
+            }
+        } else {
+            for (int i = 0; i < 2; i++) {
+                StreamView sv = new StreamView(rt, streams.get(i));
+                sv.readTo(Long.MAX_VALUE);
+            }
+        }
         end = System.currentTimeMillis();
 
-        double avg = (end-start) / numThreads;
+
+        double avg = (end-start) / 2;
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
         System.out.printf("Average latency of stream sync: %f ms\n", avg);
