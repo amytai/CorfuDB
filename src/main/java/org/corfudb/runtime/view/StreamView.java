@@ -173,6 +173,9 @@ public class StreamView implements AutoCloseable {
         if (!runtime.backpointersDisabled) {
             resolvedBackpointers.add(latestToken);
             ILogUnitEntry r = runtime.getAddressSpaceView().read(latestToken);
+            if (r == null) {
+                log.info("entry read in backpointer is null!");
+            }
             long backPointer = latestToken;
             while (r.getResultType() != LogUnitReadResponseMsg.ReadResultType.EMPTY
                     && r.getBackpointerMap().containsKey(streamID)) {
