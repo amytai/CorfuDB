@@ -718,10 +718,10 @@ public class LogUnitServer implements IServer {
         }
         else {
             if (!filledHole.contains(msg.getStreams().iterator().next())) {
-                if (randomGenerator.nextInt(50) == 0) {
+                if (randomGenerator.nextInt(25) == 0) {
                     r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_OK));
                     filledHole.add(msg.getStreams().iterator().next());
-                    log.info("Put it a hole!");
+                    log.info("Put in a hole!");
                     return;
                 }
 
