@@ -160,14 +160,13 @@ public class StreamView implements AutoCloseable {
      * @param read  The current address we are reading from.
      * @return      A list of entries that we have resolved for reading.
      */
-    public NavigableSet<Long> resolveBackpointersToRead(UUID streamID, long read) {
-        long latestToken = runtime.getSequencerView().nextToken(Collections.singleton(streamID), 0).getToken();
+    public NavigableSet<Long> resolveBackpointersToRead(UUID streamID, long read, long latestToken, NavigableSet<Long> listSoFar) {
         log.trace("Read[{}]: latest token at {}", streamID, latestToken);
         if (latestToken < read)
         {
             return new ConcurrentSkipListSet<>();
         }
-        NavigableSet<Long> resolvedBackpointers = new ConcurrentSkipListSet<>();
+        NavigableSet<Long> resolvedBackpointers = listSoFar;
         boolean hitStreamStart = false;
         boolean hitBeforeRead = false;
         if (!runtime.backpointersDisabled) {
@@ -210,6 +209,22 @@ public class StreamView implements AutoCloseable {
             long backpointerMin = resolvedBackpointers.first();
             log.info("Backpointer min is at {} but read is at {}, filling.", backpointerMin, read);
             while (backpointerMin > read && backpointerMin > 0) {
+                ILogUnitEntry isThisIt = runtime.getAddressSpaceView().read(backpointerMin);
+
+                if (isThisIt.getResultType() != LogUnitReadResponseMsg.ReadResultType.EMPTY
+                        && isThisIt.getBackpointerMap().containsKey(streamID)) {
+                    long nextBackPointer = isThisIt.getBackpointerMap().get(streamID);
+                    log.info("Scanned backPointer to {}", backpointerMin);
+
+                    if (nextBackPointer == -1L) {
+                        log.info("Hit stream start at {}, ending", backpointerMin);
+                        hitStreamStart = true;
+                        break;
+                    }
+                    //Don't add nextBackPointer. It gets added when we do the recursive call
+                    return resolveBackpointersToRead(streamID, read, nextBackPointer, resolvedBackpointers);
+                }
+
                 backpointerMin--;
                 resolvedBackpointers.add(backpointerMin);
             }
@@ -247,10 +262,13 @@ public class StreamView implements AutoCloseable {
 
             Long thisRead = getCurrentContext().currentBackpointerList.pollFirst();
             if (thisRead == null) {
+                long latestToken = runtime.getSequencerView().nextToken(Collections.singleton(streamID), 0).getToken();
                 getCurrentContext().currentBackpointerList =
                         resolveBackpointersToRead(
                                 getCurrentContext().contextID,
-                                getCurrentContext().logPointer.get());
+                                getCurrentContext().logPointer.get(),
+                                latestToken,
+                                new ConcurrentSkipListSet<>());
                 log.trace("Backpointer list was empty, it has been filled with {} entries.",
                         getCurrentContext().currentBackpointerList.size());
                 if (getCurrentContext().currentBackpointerList.size() == 0)
