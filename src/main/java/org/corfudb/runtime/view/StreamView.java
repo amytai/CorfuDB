@@ -207,6 +207,7 @@ public class StreamView implements AutoCloseable {
         }
         if (!hitStreamStart && !hitBeforeRead && resolvedBackpointers.first() != read) {
             long backpointerMin = resolvedBackpointers.first();
+            long saved = backpointerMin;
             log.info("Backpointer min is at {} but read is at {}, filling.", backpointerMin, read);
             while (backpointerMin > read && backpointerMin > 0) {
                 ILogUnitEntry isThisIt = runtime.getAddressSpaceView().read(backpointerMin);
@@ -215,6 +216,7 @@ public class StreamView implements AutoCloseable {
                         && isThisIt.getBackpointerMap().containsKey(streamID)) {
                     long nextBackPointer = isThisIt.getBackpointerMap().get(streamID);
                     log.info("Scanned backPointer to {}", backpointerMin);
+                    log.info("Iterated through {} entries", saved - backpointerMin);
 
                     if (nextBackPointer == -1L) {
                         log.info("Hit stream start at {}, ending", backpointerMin);

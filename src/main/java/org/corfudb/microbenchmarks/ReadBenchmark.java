@@ -201,9 +201,9 @@ public class ReadBenchmark {
         }*/
 
 
-        start = System.currentTimeMillis();
         if ((boolean) opts.get("-r")) {
             for (int i = 0; i < 2; i++) {
+                start = System.currentTimeMillis();
                 long limit =
                         rt.getSequencerView().nextTokenWrapper(Collections.singleton(streams.get(i)), 0, true).getBackpointerMap().get(streams.get(i));
                 RangeSet<Long> rs = TreeRangeSet.create();
@@ -213,20 +213,20 @@ public class ReadBenchmark {
 
                 //ReplexStreamView rsv = new ReplexStreamView(rt, streams.get(i));
                 //rsv.readTo(Long.MAX_VALUE);
+                end = System.currentTimeMillis();
+                System.out.printf("Latency of stream sync: %d ms\n", (end-start));
             }
         } else {
             for (int i = 0; i < 2; i++) {
+                start = System.currentTimeMillis();
                 StreamView sv = new StreamView(rt, streams.get(i));
                 sv.readTo(Long.MAX_VALUE);
+                end = System.currentTimeMillis();
+                System.out.printf("Latency of stream sync: %d ms\n", (end-start));
             }
         }
-        end = System.currentTimeMillis();
-
-
-        double avg = (end-start) / 2;
 
         System.out.println(ansi().fg(GREEN).a("SUCCESS").reset());
-        System.out.printf("Average latency of stream sync: %f ms\n", avg);
     }
 
     private static List<UUID> createStreams(int numStreams) {
