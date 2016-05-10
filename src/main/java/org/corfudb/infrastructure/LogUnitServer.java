@@ -148,6 +148,9 @@ public class LogUnitServer implements IServer {
      */
     LoadingCache<Long, LogUnitReadResponseMsg.LogUnitEntry> dataCache;
 
+    Set<UUID> filledHole = new HashSet<>();
+    Random randomGenerator = new Random(System.currentTimeMillis());
+
     long maxCacheSize;
 
     /** This cache services requests for stream addresses.
@@ -714,6 +717,14 @@ public class LogUnitServer implements IServer {
             r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_TRIMMED));
         }
         else {
+            if (!filledHole.contains(msg.getStreams().iterator().next())) {
+                if (randomGenerator.nextInt(50) == 0) {
+                    r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ERROR_OK));
+                    filledHole.add(msg.getStreams().iterator().next());
+                    return;
+                }
+
+            }
             LogUnitEntry e = new LogUnitEntry(msg.getData(), msg.getMetadataMap(), false);
             e.getBuffer().retain();
             try {
